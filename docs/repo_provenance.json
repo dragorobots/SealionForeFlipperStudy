@@ -1,0 +1,58 @@
+{
+  "date": "2025-09-09T00:00:00",
+  "git_head": "1687e1a",
+  "git_branch": "master",
+  "is_git_repo": true,
+  "repository_url": "https://github.com/dragorobots/SealionForeFlipperStudy",
+  "data_storage": "Dropbox (separate from repository)",
+  "last_known_commands": [
+    "Standardize_Datasets()",
+    "Full_MEAN_Plotter_2023_11_7()",
+    "Power_MEAN_Plotter_2023_12_19()",
+    "Paddle_MEAN_Plotter_2023_11_1()",
+    "setup_data_paths()",
+    "config_paths()"
+  ],
+  "experimental_parameters": {
+    "sampling_rate": "500 Hz",
+    "filter_cutoff": "4 Hz",
+    "force_scale": "2.22 (conversion to Newtons)",
+    "flipper_length": "190.5 mm",
+    "flow_speeds_full": "[0, 0.05, 0.1] m/s",
+    "flow_speeds_power": "[0, 28, 70, 100] (units unknown)",
+    "stroke_periods": "[1.75, 2.25] seconds",
+    "yaw_amplitudes_full": "[-70, -80, -90, -100] degrees",
+    "yaw_amplitudes_power": "[-60, -75, -90] degrees",
+    "roll_angles": "0 to 90 degrees (7-11 different angles)",
+    "power_paddle_transitions": "[50%, 55%, 60%] of stroke cycle"
+  },
+  "dataset_summary": {
+    "total_experiments": 1008,
+    "full_stroke_experiments": 504,
+    "power_stroke_experiments": 264,
+    "paddle_stroke_experiments": 84,
+    "total_data_size_mb": 150,
+    "standardized_datasets": 4,
+    "raw_datasets": 6
+  },
+  "key_functions": {
+    "segmentation": "Embedded in analysis scripts (not centralized)",
+    "filtering": "Data_Filters_Full.m (4Hz low-pass, median filter)",
+    "angle_of_attack": "AoA_Calc_Func.m",
+    "trajectory_generation": "flipper_trajs.m and variants",
+    "standardization": "Standardize_Datasets.m",
+    "visualization": "*_MEAN_Plotter_*.m, *_HeatMap_Plotter_*.m, *_Trace_Plotter_*.m"
+  },
+  "coordinate_frame": "Unknown (needs documentation)",
+  "units_status": "Mixed - some inconsistencies in flow speed units",
+  "validation_status": "Limited automated quality checks",
+  "last_validation": "Data_Struct_Analyzer.m, Check_PowerStroke_Structure.m",
+  "reorganization_status": "COMPLETED - All files moved to target structure",
+  "risks_identified": [
+    "Coordinate frame ambiguity",
+    "Unit inconsistencies", 
+    "Segmentation reliability",
+    "Missing metadata"
+  ]
+}
+

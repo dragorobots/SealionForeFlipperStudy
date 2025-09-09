@@ -1,0 +1,65 @@
+old_path	new_path	reason	status
+AoA_Calc_Func.m	src/helpers/AoA_Calc_Func.m	Pure function for angle of attack calculations, used across modules	COMPLETED
+Data_Filters_Full.m	src/helpers/Data_Filters_Full.m	Pure function for signal filtering, used across modules	COMPLETED
+Data_Filters.m	src/helpers/Data_Filters.m	Pure function for signal filtering, used across modules	COMPLETED
+shadedErrorBar.m	src/helpers/shadedErrorBar.m	Utility function for plotting, used across modules	COMPLETED
+config_paths.m	config/config_paths.m	Configuration file for paths and settings	COMPLETED
+setup_data_paths.m	config/setup_data_paths.m	Configuration script for data path setup	COMPLETED
+Standardize_Datasets.m	src/pipeline/Standardize_Datasets.m	Main pipeline entrypoint for dataset standardization	COMPLETED
+Standardize_Datasets_Corrected.m	src/pipeline/Standardize_Datasets_Corrected.m	Corrected version of standardization pipeline	COMPLETED
+Data_Struct_Analyzer.m	src/pipeline/Data_Struct_Analyzer.m	Pipeline component for data structure analysis	COMPLETED
+Simple_Data_Analyzer.m	src/pipeline/Simple_Data_Analyzer.m	Pipeline component for simple data analysis	COMPLETED
+Fix_Standardized_Datasets.m	src/pipeline/Fix_Standardized_Datasets.m	Pipeline component for fixing standardized datasets	COMPLETED
+Fix_PowerStroke_Only.m	src/pipeline/Fix_PowerStroke_Only.m	Pipeline component for power stroke fixes	COMPLETED
+Simple_Fix_Datasets.m	src/pipeline/Simple_Fix_Datasets.m	Pipeline component for simple dataset fixes	COMPLETED
+Verify_Standardized_Datasets.m	src/pipeline/Verify_Standardized_Datasets.m	Pipeline component for dataset verification	COMPLETED
+Verify_Fixed_Datasets.m	src/pipeline/Verify_Fixed_Datasets.m	Pipeline component for fixed dataset verification	COMPLETED
+check_parameters_structure.m	src/pipeline/check_parameters_structure.m	Pipeline component for parameter structure checking	COMPLETED
+Check_PowerStroke_Structure.m	src/pipeline/Check_PowerStroke_Structure.m	Pipeline component for power stroke structure checking	COMPLETED
+Full_MEAN_Plotter_2023_11_7.m	analysis/good/Full_MEAN_Plotter_2023_11_7.m	Validated analysis script that reproduces known results	COMPLETED
+Power_MEAN_Plotter_2023_12_19.m	analysis/good/Power_MEAN_Plotter_2023_12_19.m	Validated analysis script that reproduces known results	COMPLETED
+Power_MEAN_Plotter_2024_01_22.m	analysis/good/Power_MEAN_Plotter_2024_01_22.m	Latest validated analysis script	COMPLETED
+Paddle_MEAN_Plotter_2023_11_1.m	analysis/good/Paddle_MEAN_Plotter_2023_11_1.m	Validated analysis script that reproduces known results	COMPLETED
+Full_HeatMap_Plotter_2023_11_1.m	analysis/good/Full_HeatMap_Plotter_2023_11_1.m	Validated plotting script for heat maps	COMPLETED
+Power_HeatMap_Plotter_2023_11_1.m	analysis/good/Power_HeatMap_Plotter_2023_11_1.m	Validated plotting script for heat maps	COMPLETED
+Paddle_HeatMap_Plotter_2023_11_1.m	analysis/good/Paddle_HeatMap_Plotter_2023_11_1.m	Validated plotting script for heat maps	COMPLETED
+Full_Trace_Plotter_2023_11_1.m	analysis/good/Full_Trace_Plotter_2023_11_1.m	Validated plotting script for traces	COMPLETED
+Power_Trace_Plotter_2023_11_1.m	analysis/good/Power_Trace_Plotter_2023_11_1.m	Validated plotting script for traces	COMPLETED
+Paddle_Trace_Plotter_2023_11_1.m	analysis/good/Paddle_Trace_Plotter_2023_11_1.m	Validated plotting script for traces	COMPLETED
+Full_Trace_Appendix_Maker_04292024.m	analysis/good/Full_Trace_Appendix_Maker_04292024.m	Recent validated analysis script	COMPLETED
+Paddle_Trace_Appendix_Maker_04292024.m	analysis/good/Paddle_Trace_Appendix_Maker_04292024.m	Recent validated analysis script	COMPLETED
+Power_Trace_Appendix_Maker_01302024.m	analysis/good/Power_Trace_Appendix_Maker_01302024.m	Recent validated analysis script	COMPLETED
+Old_Results_Workers/	analysis/legacy/Old_Results_Workers/	Legacy analysis scripts, not part of validated path	COMPLETED
+Stuff_For_Shraman/	analysis/legacy/Stuff_For_Shraman/	Specialized analysis tools, not part of main pipeline	COMPLETED
+Power_MEAN_Plotter_2023_11_1.m	analysis/legacy/Power_MEAN_Plotter_2023_11_1.m	Older version, superseded by 2023_12_19 version	COMPLETED
+FULL_Stroke_Results_Worker_07112023.m	analysis/legacy/FULL_Stroke_Results_Worker_07112023.m	Legacy worker script	COMPLETED
+FULL_Stroke_Results_Worker_v2.m	analysis/legacy/FULL_Stroke_Results_Worker_v2.m	Legacy worker script	COMPLETED
+Results_Worker_Full_Stroke_2023_10_18.m	analysis/legacy/Results_Worker_Full_Stroke_2023_10_18.m	Legacy worker script	COMPLETED
+Results_Worker_Power_Stroke_2023_10_18.m	analysis/legacy/Results_Worker_Power_Stroke_2023_10_18.m	Legacy worker script	COMPLETED
+Results_Worker_Single_Trace.m	analysis/legacy/Results_Worker_Single_Trace.m	Legacy worker script	COMPLETED
+flipper_trajs.m	src/helpers/flipper_trajs.m	Pure function for trajectory generation	COMPLETED
+flipper_trajs_constrained.m	src/helpers/flipper_trajs_constrained.m	Pure function for constrained trajectory generation	COMPLETED
+flipper_trajs_simulation_2.m	src/helpers/flipper_trajs_simulation_2.m	Pure function for trajectory simulation	COMPLETED
+Traj_Builder_Constrained.m	src/helpers/Traj_Builder_Constrained.m	Pure function for trajectory building	COMPLETED
+Figure_Creator_2D.m	src/helpers/Figure_Creator_2D.m	Utility function for figure creation	COMPLETED
+Matlab_Flipper_Test.m	src/pipeline/Matlab_Flipper_Test.m	Main control and testing pipeline entrypoint	COMPLETED
+Test_Flow_Tank.m	src/pipeline/Test_Flow_Tank.m	Flow tank control pipeline entrypoint	COMPLETED
+Single_Stroke_Data_Collector.m	src/pipeline/Single_Stroke_Data_Collector.m	Data collection pipeline entrypoint	COMPLETED
+Data_Collecting_Functions/	src/pipeline/Data_Collecting_Functions/	Automated data collection pipeline components	COMPLETED
+Master_Data_Set_Backup/	data/raw/Master_Data_Set_Backup/	Immutable raw experimental data	COMPLETED
+Raw_Experimental_Data/	data/raw/Raw_Experimental_Data/	Immutable raw experimental data	COMPLETED
+Standardized_Data_Sets/	data/processed/Standardized_Data_Sets/	Final analysis-ready datasets	COMPLETED
+Full_Traces.mat	data/processed/Full_Traces.mat	Processed trace data ready for analysis	COMPLETED
+Power_Traces.mat	data/processed/Power_Traces.mat	Processed trace data ready for analysis	COMPLETED
+Paddle_Traces.mat	data/processed/Paddle_Traces.mat	Processed trace data ready for analysis	COMPLETED
+Real_Force_Data_Characteristic_Stroke.mat	data/processed/Real_Force_Data_Characteristic_Stroke.mat	Processed force data	COMPLETED
+Robot_Forces_Learned_Traj.mat	data/processed/Robot_Forces_Learned_Traj.mat	Processed robot force data	COMPLETED
+Results/	results/	Numerical results and tables for reports	COMPLETED
+Flipper_Videos/	data/raw/Flipper_Videos/	Raw video recordings	COMPLETED
+html/	docs/html/	Documentation and figures	COMPLETED
+example_analysis.m	analysis/good/example_analysis.m	Example analysis script	COMPLETED
+tester.m	analysis/legacy/tester.m	Test script, not part of validated path	COMPLETED
+Matlab_Ard_Comms_SL_20221006/	config/Matlab_Ard_Comms_SL_20221006/	Arduino communication configuration	COMPLETED
+Matlab_Motor_Flow_Control/	config/Matlab_Motor_Flow_Control/	Motor control configuration	COMPLETED
+Pull_Flipper_Kinematics_Shraman.m	analysis/legacy/Pull_Flipper_Kinematics_Shraman.m	Specialized analysis for Shraman	COMPLETED
+
