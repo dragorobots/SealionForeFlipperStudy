@@ -4,13 +4,14 @@
 % This script demonstrates how to use the reorganized repository
 
 % Add paths to data and helper functions
-addpath('../data/processed/Standardized_Data_Sets')
-addpath('../src/helpers')
+addpath('../../data/processed/Standardized_Data_Sets')
+addpath('../../src/helpers')
 
 % Load a standardized dataset
-load('../data/processed/Standardized_Data_Sets/FullStroke_Standardized.mat')
+load('../../data/processed/Standardized_Data_Sets/FullStroke_Curated.mat')
 
 % Example analysis
 fprintf('Example analysis complete.\n');
-fprintf('Dataset contains %d experiments\n', FullStroke_Standardized.total_experiments);
+% Check what variables are available in the loaded data
+whos
 
