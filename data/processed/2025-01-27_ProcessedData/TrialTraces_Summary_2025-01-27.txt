@@ -1,0 +1,1911 @@
+TRIAL TRACE PROCESSING SUMMARY REPORT
+==================================================
+
+PROCESSING METADATA:
+--------------------
+processing_date: 2025-09-12T15:13:01.205501
+source_file: data/processed/2025-01-27_ProcessedData/FullStroke_Complete_2025-01-27.h5
+cutoff_frequency: 4.0
+sampling_rate: 500.0
+scale_factor: 2.22
+total_experiments: 126
+successful_experiments: 126
+
+EXPERIMENT SUMMARY:
+--------------------
+Total experiments: 126
+Successfully processed: 126
+Success rate: 100.0%
+
+INDIVIDUAL EXPERIMENT DETAILS:
+------------------------------
+
+exp_000:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -90.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.384s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_001:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -75.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.440s
+    trial_duration: 2.834s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1417 samples
+  Trial duration: 2.834s
+
+exp_002:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -60.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.330s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_003:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -45.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.382s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_004:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -30.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.310s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_005:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -15.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.344s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_006:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: 0.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.332s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_007:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -90.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.224s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_008:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -75.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.298s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_009:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -60.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.390s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_010:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -45.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.288s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_011:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -30.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.304s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_012:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -15.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.462s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_013:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: 0.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.382s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_014:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -90.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.324s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_015:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -75.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.108s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_016:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -60.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.286s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_017:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -45.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.256s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_018:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -30.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.302s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_019:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -15.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.368s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_020:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: 0.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.448s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_021:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -90.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.146s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_022:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -75.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.436s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_023:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -60.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.290s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_024:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -45.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.440s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_025:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -30.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.240s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_026:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -15.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.122s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_027:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: 0.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.232s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_028:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -90.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.386s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_029:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -75.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.380s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_030:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -60.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.290s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_031:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -45.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.408s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_032:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -30.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.368s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_033:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -15.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.318s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_034:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: 0.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.376s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_035:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -90.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.106s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_036:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -75.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.224s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_037:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -60.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.370s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_038:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -45.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.436s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_039:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -30.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.028s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_040:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -15.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.426s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_041:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: 0.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.254s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_042:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -90.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.232s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_043:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -75.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.320s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_044:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -60.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.238s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_045:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -45.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.432s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_046:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -30.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.320s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_047:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -15.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.316s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_048:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: 0.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.228s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_049:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -90.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.292s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_050:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -75.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.240s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_051:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -60.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.316s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_052:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -45.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.358s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.684s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_053:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -30.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.188s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_054:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -15.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.302s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_055:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: 0.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.234s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_056:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -90.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.240s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_057:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -75.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.192s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_058:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -60.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.038s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_059:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -45.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.206s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_060:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -30.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.298s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_061:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -15.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.354s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_062:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: 0.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.302s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_063:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -90.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.310s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_064:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -75.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.168s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_065:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -60.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.324s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_066:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -45.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.210s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_067:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -30.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.176s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_068:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -15.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.384s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_069:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: 0.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.390s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_070:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -90.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.220s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_071:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -75.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.322s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_072:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -60.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.232s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_073:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -45.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.390s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_074:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -30.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.382s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_075:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -15.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.236s
+    trial_duration: 2.834s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1417 samples
+  Trial duration: 2.834s
+
+exp_076:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: 0.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.232s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_077:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -90.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.382s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_078:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -75.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.254s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_079:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -60.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.414s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_080:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -45.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.110s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_081:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -30.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.174s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_082:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -15.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.160s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_083:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: 0.0
+    paddle_transition: 0.5
+  Timing:
+    first_trial_start: 1.108s
+    trial_duration: 2.834s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1417 samples
+  Trial duration: 2.834s
+
+exp_084:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -90.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.096s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_085:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -75.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.242s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_086:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -60.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.286s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_087:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -45.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.308s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_088:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -30.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.016s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_089:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -15.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.204s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_090:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: 0.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.362s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_091:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -90.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.060s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_092:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -75.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.390s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_093:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -60.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.080s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_094:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -45.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.450s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_095:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -30.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.270s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_096:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -15.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.324s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_097:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: 0.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.154s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_098:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -90.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.382s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_099:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -75.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.100s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_100:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -60.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.326s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_101:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -45.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.362s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_102:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -30.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.326s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_103:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -15.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.228s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_104:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: 0.0
+    paddle_transition: 0.55
+  Timing:
+    first_trial_start: 1.348s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_105:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -90.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.216s
+    trial_duration: 2.834s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1417 samples
+  Trial duration: 2.834s
+
+exp_106:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -75.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.416s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_107:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -60.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.256s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_108:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -45.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.444s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_109:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -30.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 0.762s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_110:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: -15.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.454s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_111:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -70.0
+    roll_angle: 0.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.190s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_112:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -90.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.288s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_113:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -75.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 0.954s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_114:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -60.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.408s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_115:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -45.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 0.902s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_116:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -30.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.284s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_117:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: -15.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.360s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_118:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -80.0
+    roll_angle: 0.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.366s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_119:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -90.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.276s
+    trial_duration: 2.834s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1417 samples
+  Trial duration: 2.834s
+
+exp_120:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -75.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.148s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_121:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -60.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.230s
+    trial_duration: 2.834s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1417 samples
+  Trial duration: 2.834s
+
+exp_122:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -45.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.022s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_123:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -30.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 0.972s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_124:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: -15.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.296s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
+
+exp_125:
+  Parameters:
+    period: 2.25
+    yaw_amplitude: -90.0
+    roll_angle: 0.0
+    paddle_transition: 0.6
+  Timing:
+    first_trial_start: 1.232s
+    trial_duration: 2.832s
+    inter_trial_gap: 1.682s
+    num_trials: 5.000s
+  Trials: 5
+  Time vector length: 1416 samples
+  Trial duration: 2.832s
