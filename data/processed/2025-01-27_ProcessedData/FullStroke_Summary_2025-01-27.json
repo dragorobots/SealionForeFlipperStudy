@@ -1,12 +1,16 @@
 {
   "experiment_type": "Full Stroke",
-  "processing_date": "2025-09-12 13:39:07",
+  "processing_date": "2025-09-15 10:31:49",
   "source_datasets": [
     "20-Jan-2023_results_FullStroke.mat",
+    "23-Jan-2023_results_FullStroke.mat",
     "30-Jan-2023_results_FullStroke.mat"
   ],
   "target_parameters": {
-    "period": 2.25,
+    "periods": [
+      1.75,
+      2.25
+    ],
     "yaw_amplitudes": [
       -70,
       -80,
@@ -19,12 +23,19 @@
     ],
     "flow_speeds": [
       0.0,
+      0.05,
       0.1
     ]
   },
-  "total_experiments": 126,
-  "experiments_from_20Jan": 63,
-  "experiments_from_30Jan": 63,
+  "total_experiments": 378,
+  "experiments_from_20Jan": 126,
+  "experiments_from_23Jan": 126,
+  "experiments_from_30Jan": 126,
+  "source_order": [
+    "20-Jan",
+    "23-Jan",
+    "30-Jan"
+  ],
   "data_dimensions": {
     "time_points": 15000,
     "channels": 3,

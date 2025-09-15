@@ -50,6 +50,8 @@ class TrialTraceProcessor:
         self.data = None
         self.parameters = None
         self.zeros = None
+        self._sorted_exp_keys = None
+        self._flow_boundaries = None  # list of (end_index_exclusive, flow_value)
         
         # Load data
         self.load_data()
@@ -62,13 +64,15 @@ class TrialTraceProcessor:
             # Load data
             data_group = f['data']
             self.data = {}
-            for exp_key in data_group.keys():
+            # Sort keys to preserve numeric order exp_000, exp_001, ...
+            self._sorted_exp_keys = sorted(list(data_group.keys()))
+            for exp_key in self._sorted_exp_keys:
                 self.data[exp_key] = np.array(data_group[exp_key])
             
             # Load parameters
             param_group = f['parameters']
             self.parameters = {}
-            for exp_key in param_group.keys():
+            for exp_key in self._sorted_exp_keys:
                 # Parameters are stored as a single dataset with shape (4, 1)
                 # [period, yaw_amp, roll_angle, paddle_transition]
                 param_data = np.array(param_group[exp_key])
@@ -82,10 +86,48 @@ class TrialTraceProcessor:
             # Load zeros
             zeros_group = f['zeros']
             self.zeros = {}
-            for exp_key in zeros_group.keys():
+            for exp_key in self._sorted_exp_keys:
                 self.zeros[exp_key] = np.array(zeros_group[exp_key])
+
+            # Build flow mapping from metadata (supports 20-Jan, 23-Jan, 30-Jan)
+            meta_group = f['metadata']
+            # Attributes may be JSON-encoded strings for complex types
+            def _get_attr(name, default=None):
+                try:
+                    val = meta_group.attrs[name]
+                    if isinstance(val, bytes):
+                        val = val.decode('utf-8')
+                    return val
+                except Exception:
+                    return default
+            n20 = int(_get_attr('experiments_from_20Jan', 0))
+            n23 = int(_get_attr('experiments_from_23Jan', 0))
+            n30 = int(_get_attr('experiments_from_30Jan', 0))
+            # Define boundaries by cumulative counts in sorted order of creation
+            self._flow_boundaries = []
+            cursor = 0
+            if n20 > 0:
+                cursor += n20
+                self._flow_boundaries.append((cursor, 0.1))
+            if n23 > 0:
+                cursor += n23
+                self._flow_boundaries.append((cursor, 0.05))
+            if n30 > 0:
+                cursor += n30
+                self._flow_boundaries.append((cursor, 0.0))
         
         print(f"Loaded {len(self.data)} experiments")
+
+    def _flow_for_index(self, idx):
+        """Return flow speed for a given experiment index based on metadata boundaries.
+        Falls back to 0.0 if not available."""
+        if not self._flow_boundaries:
+            return 0.0
+        for end_idx, flow in self._flow_boundaries:
+            if idx < end_idx:
+                return flow
+        # Default to last known or 0.0
+        return self._flow_boundaries[-1][1] if len(self._flow_boundaries) > 0 else 0.0
     
     def detect_trial_timing_from_arduino(self, arduino_signal, fs=500):
         """
@@ -348,9 +390,12 @@ class TrialTraceProcessor:
         }
         
         successful_count = 0
-        for exp_key in self.data.keys():
+        for idx, exp_key in enumerate(self._sorted_exp_keys):
             result = self.process_experiment(exp_key)
             if result is not None:
+                # Attach computed flow into parameters for downstream consumers
+                flow_val = self._flow_for_index(idx)
+                result['parameters']['flow'] = flow_val
                 results['experiments'][exp_key] = result
                 successful_count += 1
         
@@ -383,7 +428,9 @@ class TrialTraceProcessor:
             
             # Save experiments
             exp_group = f.create_group('experiments')
-            for exp_key, exp_data in results['experiments'].items():
+            # Ensure deterministic order by sorted keys
+            for exp_key in sorted(results['experiments'].keys()):
+                exp_data = results['experiments'][exp_key]
                 exp_subgroup = exp_group.create_group(exp_key)
                 
                 # Save parameters

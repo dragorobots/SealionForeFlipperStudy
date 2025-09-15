@@ -37,6 +37,7 @@ class TrialTracesPlotGUI:
 
         self.experiments = {}           # exp_key -> dict with parameters, time_vector, thrust_mean, lift_mean, thrust_std, lift_std
         self.param_index = {            # unique values
+            'period': set(),
             'flow': set(),
             'yaw': set(),
             'roll': set(),
@@ -52,17 +53,24 @@ class TrialTracesPlotGUI:
         self.build_ui()
 
     def find_trial_traces_file(self) -> str | None:
-        # Prefer the known path
+        # Search for all TrialTraces_Complete_*.h5 and pick the most recent by mtime
         base_dir = os.path.join('data', 'processed')
         if not os.path.isdir(base_dir):
             return None
-        candidate = None
+        candidates = []
         for root, dirs, files in os.walk(base_dir):
             for f in files:
                 if f.startswith('TrialTraces_Complete_') and f.endswith('.h5'):
-                    candidate = os.path.join(root, f)
-                    return candidate
-        return None
+                    path = os.path.join(root, f)
+                    try:
+                        mtime = os.path.getmtime(path)
+                    except Exception:
+                        mtime = 0
+                    candidates.append((mtime, path))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda t: t[0], reverse=True)
+        return candidates[0][1]
 
     def map_flow_from_fullstroke(self, exp_index: int) -> float:
         """
@@ -84,10 +92,13 @@ class TrialTracesPlotGUI:
             try:
                 with h5py.File(fullstroke_path, 'r') as fh:
                     meta = fh['metadata']
-                    n20 = int(meta.attrs.get('experiments_from_20Jan', 63))
-                    # 20-Jan corresponds to 0.1 m/s; 30-Jan corresponds to 0.0 m/s
+                    n20 = int(meta.attrs.get('experiments_from_20Jan', 0))
+                    n23 = int(meta.attrs.get('experiments_from_23Jan', 0))
+                    # Map sequentially: 20-Jan → 0.1, 23-Jan → 0.05, 30-Jan → 0.0
                     if exp_index < n20:
                         return 0.1
+                    if exp_index < n20 + n23:
+                        return 0.05
                     return 0.0
             except Exception:
                 pass
@@ -98,8 +109,12 @@ class TrialTracesPlotGUI:
             with h5py.File(self.h5_path, 'r') as f:
                 exp_keys = list(f['experiments'].keys())
                 total = len(exp_keys)
-                half = total // 2
-                return 0.1 if exp_index < half else 0.0
+                third = max(1, total // 3)
+                if exp_index < third:
+                    return 0.1
+                if exp_index < 2 * third:
+                    return 0.05
+                return 0.0
         except Exception:
             return 0.0
 
@@ -114,8 +129,24 @@ class TrialTracesPlotGUI:
                 period = float(param_attrs.get('period', 2.25))
                 yaw = float(param_attrs.get('yaw_amplitude', np.nan))
                 roll = float(param_attrs.get('roll_angle', np.nan))
+                # Normalize signs for clarity
+                try:
+                    yaw = abs(yaw)
+                except Exception:
+                    pass
+                try:
+                    roll = abs(roll)
+                except Exception:
+                    pass
                 paddle = float(param_attrs.get('paddle_transition', np.nan))
-                flow = self.map_flow_from_fullstroke(idx)
+                # Prefer per-experiment flow saved by processor; fallback to mapping
+                flow = param_attrs.get('flow', np.nan)
+                try:
+                    flow = float(flow)
+                    if np.isnan(flow):
+                        raise ValueError
+                except Exception:
+                    flow = self.map_flow_from_fullstroke(idx)
 
                 time_vec = grp['time_vector'][:]
                 thrust_mean = grp['thrust']['mean_trace'][:]
@@ -141,13 +172,16 @@ class TrialTracesPlotGUI:
                     self.param_index['yaw'].add(yaw)
                 if not np.isnan(roll):
                     self.param_index['roll'].add(roll)
+                if not np.isnan(period):
+                    self.param_index['period'].add(period)
                 self.param_index['flow'].add(flow)
                 if not np.isnan(paddle):
                     self.param_index['pt'].add(paddle)
 
-                self.exp_lookup.append((exp_key, flow, yaw, roll, paddle))
+                self.exp_lookup.append((exp_key, flow, period, yaw, roll, paddle))
 
         # Sort parameter options for UI
+        self.param_index['period'] = sorted(list(self.param_index['period']))
         self.param_index['flow'] = sorted(list(self.param_index['flow']))
         self.param_index['yaw'] = sorted(list(self.param_index['yaw']))
         self.param_index['roll'] = sorted(list(self.param_index['roll']))
@@ -315,48 +349,55 @@ class TrialTracesPlotGUI:
                                values=[str(v) for v in self.param_index['flow']])
         flow_cb.grid(row=0, column=2, padx=(0, 12))
 
-        ttk.Label(rowf, text="Yaw").grid(row=0, column=3)
+        ttk.Label(rowf, text="Period").grid(row=0, column=3)
+        period_var = tk.StringVar()
+        period_cb = ttk.Combobox(rowf, width=6, state='readonly', textvariable=period_var,
+                                 values=[f"{v:.2f}" if abs(v - round(v)) > 1e-6 else str(int(v)) for v in self.param_index['period']])
+        period_cb.grid(row=0, column=4, padx=(0, 12))
+
+        ttk.Label(rowf, text="Yaw").grid(row=0, column=5)
         yaw_var = tk.StringVar()
         yaw_cb = ttk.Combobox(rowf, width=6, state='readonly', textvariable=yaw_var,
                               values=[str(int(v)) for v in self.param_index['yaw']])
-        yaw_cb.grid(row=0, column=4, padx=(0, 12))
+        yaw_cb.grid(row=0, column=6, padx=(0, 12))
 
-        ttk.Label(rowf, text="Roll").grid(row=0, column=5)
+        ttk.Label(rowf, text="Roll").grid(row=0, column=7)
         roll_var = tk.StringVar()
         roll_cb = ttk.Combobox(rowf, width=6, state='readonly', textvariable=roll_var,
                                values=[str(int(v)) for v in self.param_index['roll']])
-        roll_cb.grid(row=0, column=6, padx=(0, 12))
+        roll_cb.grid(row=0, column=8, padx=(0, 12))
 
-        ttk.Label(rowf, text="PT").grid(row=0, column=7)
+        ttk.Label(rowf, text="PT").grid(row=0, column=9)
         pt_var = tk.StringVar()
         pt_vals = [f"{v:.2f}" if abs(v - round(v)) > 1e-6 else str(int(v)) for v in self.param_index['pt']]
-        ttk.Combobox(rowf, width=6, state='readonly', textvariable=pt_var, values=pt_vals).grid(row=0, column=8, padx=(0, 12))
+        ttk.Combobox(rowf, width=6, state='readonly', textvariable=pt_var, values=pt_vals).grid(row=0, column=10, padx=(0, 12))
 
         # Style controls: Color (HEX), Line Width, Variance toggle, Alpha
-        ttk.Label(rowf, text="Color").grid(row=0, column=9)
+        ttk.Label(rowf, text="Color").grid(row=0, column=11)
         color_var = tk.StringVar()
-        ttk.Entry(rowf, width=8, textvariable=color_var).grid(row=0, column=10, padx=(0, 8))
+        ttk.Entry(rowf, width=8, textvariable=color_var).grid(row=0, column=12, padx=(0, 8))
 
-        ttk.Label(rowf, text="LW").grid(row=0, column=11)
+        ttk.Label(rowf, text="LW").grid(row=0, column=13)
         lw_var = tk.StringVar()
-        ttk.Entry(rowf, width=4, textvariable=lw_var).grid(row=0, column=12, padx=(0, 8))
+        ttk.Entry(rowf, width=4, textvariable=lw_var).grid(row=0, column=14, padx=(0, 8))
 
         var_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(rowf, text="Variance", variable=var_var).grid(row=0, column=13, padx=(0, 8))
+        ttk.Checkbutton(rowf, text="Variance", variable=var_var).grid(row=0, column=15, padx=(0, 8))
 
-        ttk.Label(rowf, text="Alpha").grid(row=0, column=14)
+        ttk.Label(rowf, text="Alpha").grid(row=0, column=16)
         alpha_var = tk.StringVar()
-        ttk.Entry(rowf, width=4, textvariable=alpha_var).grid(row=0, column=15)
+        ttk.Entry(rowf, width=4, textvariable=alpha_var).grid(row=0, column=17)
 
         # Legend controls: include + custom label text
         legend_on_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(rowf, text="Legend", variable=legend_on_var).grid(row=0, column=16, padx=(8, 4))
+        ttk.Checkbutton(rowf, text="Legend", variable=legend_on_var).grid(row=0, column=18, padx=(8, 4))
         legend_label_var = tk.StringVar()
-        ttk.Entry(rowf, width=18, textvariable=legend_label_var).grid(row=0, column=17)
+        ttk.Entry(rowf, width=18, textvariable=legend_label_var).grid(row=0, column=19)
 
         return {
             'include': include_var,
             'flow': flow_var,
+            'period': period_var,
             'yaw': yaw_var,
             'roll': roll_var,
             'pt': pt_var,
@@ -371,6 +412,7 @@ class TrialTracesPlotGUI:
     def _seed_defaults(self) -> None:
         # Default to plotting a small sweep across yaw at roll=-45, flow=0.0 if available
         default_flow = str(self.param_index['flow'][0]) if self.param_index['flow'] else '0.0'
+        default_period = (f"{self.param_index['period'][0]:.2f}" if self.param_index['period'] else '2.25')
         default_roll = '-45'
         default_yaws = [
             str(int(v)) for v in self.param_index['yaw'][:5]
@@ -382,6 +424,7 @@ class TrialTracesPlotGUI:
         for i, row in enumerate(self.dataset_rows):
             row['flow'].set(default_flow)
             row['roll'].set(default_roll if default_roll in [str(int(v)) for v in self.param_index['roll']] else (str(int(self.param_index['roll'][0])) if self.param_index['roll'] else '0'))
+            row['period'].set(default_period)
             if i < len(default_yaws):
                 row['yaw'].set(default_yaws[i])
                 row['include'].set(True)
@@ -400,21 +443,22 @@ class TrialTracesPlotGUI:
             row['alpha'].set('0.2')
             # Default legend label
             try:
-                default_lbl = f"flow={default_flow}, yaw={row['yaw'].get()}, roll={row['roll'].get()}"
+                default_lbl = f"flow={default_flow}, P={row['period'].get()}, yaw={row['yaw'].get()}, roll={row['roll'].get()}"
             except Exception:
                 default_lbl = ''
             row['legend_on'].set(True)
             row['legend_label'].set(default_lbl)
 
-    def _select_experiment(self, flow: float, yaw: float, roll: float, pt: float | None = None) -> str | None:
+    def _select_experiment(self, flow: float, period: float, yaw: float, roll: float, pt: float | None = None) -> str | None:
         """
-        Choose an experiment matching flow, yaw, roll.
+        Choose an experiment matching flow, period, yaw, roll.
         If pt is provided, pick exact PT match. Otherwise prefer paddle priority 0.5, 0.55, 0.6.
         Returns exp_key or None.
         """
         candidates = []
-        for exp_key, f, y, r, p in self.exp_lookup:
-            if abs(f - flow) < 1e-6 and abs(y - yaw) < 1e-6 and abs(r - roll) < 1e-6:
+        for exp_key, f, per, y, r, p in self.exp_lookup:
+            if (abs(f - flow) < 1e-6 and abs(per - period) < 1e-6 and
+                abs(y - yaw) < 1e-6 and abs(r - roll) < 1e-6):
                 # If PT specified, only include matching PT
                 if pt is not None and abs(float(p) - float(pt)) > 1e-6:
                     continue
@@ -439,6 +483,7 @@ class TrialTracesPlotGUI:
                     continue
                 try:
                     flow = float(row['flow'].get())
+                    period = float(row['period'].get())
                     yaw = float(row['yaw'].get())
                     roll = float(row['roll'].get())
                     try:
@@ -447,10 +492,10 @@ class TrialTracesPlotGUI:
                         pt = None
                 except ValueError:
                     continue
-                exp_key = self._select_experiment(flow, yaw, roll, pt)
+                exp_key = self._select_experiment(flow, period, yaw, roll, pt)
                 if exp_key is None:
                     continue
-                selections.append((exp_key, flow, yaw, roll))
+                selections.append((exp_key, flow, period, yaw, roll))
 
             # Clear axes
             self.ax.clear()
@@ -484,17 +529,17 @@ class TrialTracesPlotGUI:
             self.ax.tick_params(labelsize=axis_fs)
 
             # Plot in reverse so first selection is on top
-            for exp_key, flow, yaw, roll in reversed(selections):
+            for exp_key, flow, period, yaw, roll in reversed(selections):
                 exp = self.experiments[exp_key]
                 t = exp['time']
                 if self.channel_var.get() == 'thrust':
                     y = exp['thrust_mean']
                     ystd = exp['thrust_std']
-                    label = f"T: flow={flow}, yaw={int(yaw)}, roll={int(roll)}"
+                    label = f"T: flow={flow}, P={period}, yaw={int(yaw)}, roll={int(roll)}"
                 else:
                     y = exp['lift_mean']
                     ystd = exp['lift_std']
-                    label = f"L: flow={flow}, yaw={int(yaw)}, roll={int(roll)}"
+                    label = f"L: flow={flow}, P={period}, yaw={int(yaw)}, roll={int(roll)}"
 
                 # Styles
                 color = None
@@ -507,6 +552,8 @@ class TrialTracesPlotGUI:
                         if not row['include'].get():
                             continue
                         if abs(float(row['flow'].get()) - flow) > 1e-6:
+                            continue
+                        if abs(float(row['period'].get()) - period) > 1e-6:
                             continue
                         if abs(float(row['yaw'].get()) - yaw) > 1e-6:
                             continue
