@@ -281,16 +281,207 @@ class FullStrokeOverviewGUI(QMainWindow):
         except Exception:
             self.twist_color_map = {}
 
+        # Populate master combos when available
+        try:
+            if hasattr(self, 'master_flow'):
+                self.master_flow.clear(); self.master_flow.addItems([str(v) for v in self.param_index.get('flow', [])])
+            if hasattr(self, 'master_period'):
+                per = [f"{v:.2f}" if abs(v - round(v)) > 1e-6 else str(int(v)) for v in self.param_index.get('period', [])]
+                self.master_period.clear(); self.master_period.addItems(per)
+            if hasattr(self, 'master_yaw'):
+                self.master_yaw.clear(); self.master_yaw.addItems([str(int(v)) for v in self.param_index.get('sweep', [])])
+            if hasattr(self, 'master_roll'):
+                self.master_roll.clear(); self.master_roll.addItems([str(int(v)) for v in self.param_index.get('twist', [])])
+            if hasattr(self, 'master_pt'):
+                pt = [f"{v:.2f}" if abs(v - round(v)) > 1e-6 else str(int(v)) for v in self.param_index.get('overlap', [])]
+                self.master_pt.clear(); self.master_pt.addItems(pt)
+        except Exception:
+            pass
+
     def _build_twist_color_map(self):
         """Create a categorical color map for twist values (consistent across app)."""
         twists = self.param_index.get('twist', [])
-        colors = []
-        # Use tab10 / tab20 palettes
-        base = plt.cm.tab10
-        for i in range(len(twists)):
-            c = base(i % 10)
+        choice = getattr(self, 'overview_palette_choice', 'Default')
+        if choice == 'Custom' and hasattr(self, 'overview_custom_colors') and self.overview_custom_colors:
+            palette = list(self.overview_custom_colors)
+        elif choice == 'CB friendly':
+            palette = ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
+        else:
+            palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        return {tw: palette[idx % len(palette)] for idx, tw in enumerate(twists)}
+
+    def create_overview_settings_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Palette controls
+        palette_group = QGroupBox("Overview Color Palette (Mean/Peak/Vector)")
+        palette_layout = QGridLayout(palette_group)
+        palette_layout.addWidget(QLabel("Palette"), 0, 0)
+        self.overview_palette_select = QComboBox()
+        self.overview_palette_select.addItems(['Default', 'CB friendly', 'Custom'])
+        self.overview_palette_choice = 'Default'
+        self.overview_palette_select.currentTextChanged.connect(self._on_palette_selection_changed)
+        palette_layout.addWidget(self.overview_palette_select, 0, 1)
+        # Custom colors (10 hex boxes)
+        self.overview_custom_color_edits = []
+        for i in range(10):
+            edit = QLineEdit()
+            edit.setPlaceholderText('#RRGGBB')
+            edit.setMaximumWidth(90)
+            edit.setEnabled(False)
+            self.overview_custom_color_edits.append(edit)
+            r = 1 + i // 5
+            c = i % 5
+            palette_layout.addWidget(edit, r, c)
+        apply_btn = QPushButton("Apply Palette")
+        apply_btn.clicked.connect(self._apply_overview_palette)
+        palette_layout.addWidget(apply_btn, 3, 5)
+        layout.addWidget(palette_group)
+
+        # Publish all overview plots
+        puball_group = QGroupBox("Publish All Overview Plots")
+        puball_layout = QHBoxLayout(puball_group)
+        self.publish_all_button = QPushButton("Publish All (Mean/Peak/Vector)")
+        self.publish_all_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
+        self.publish_all_button.clicked.connect(self.publish_all_overview_plots)
+        puball_layout.addWidget(self.publish_all_button)
+        puball_layout.addStretch()
+        layout.addWidget(puball_group)
+
+        self.tab_widget.addTab(tab, "Overview Settings")
+
+    def _on_palette_selection_changed(self, text):
+        self.overview_palette_choice = text
+        enable = (text == 'Custom')
+        for e in getattr(self, 'overview_custom_color_edits', []):
+            e.setEnabled(enable)
+
+    def _apply_overview_palette(self):
+        if getattr(self, 'overview_palette_choice', 'Default') == 'Custom':
+            colors = []
+            for e in getattr(self, 'overview_custom_color_edits', []):
+                c = e.text().strip()
+                if c:
+                    if not c.startswith('#'):
+                        c = '#' + c
             colors.append(c)
-        return {tw: colors[idx] for idx, tw in enumerate(twists)}
+            if not colors:
+                colors = ['#1f77b4']
+            self.overview_custom_colors = colors
+        # Rebuild twist color map
+        try:
+            self.twist_color_map = self._build_twist_color_map()
+        except Exception:
+            pass
+        # Redraw existing overview tabs if present
+        try:
+            if hasattr(self, 'mean_force_canvas'):
+                self.plot_mean_force()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'peak_location_canvas'):
+                self.plot_peak_location()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'vector_canvas'):
+                self.plot_vector()
+        except Exception:
+            pass
+
+    def publish_all_overview_plots(self):
+        outdir = os.path.join(os.getcwd(), f"Full_Stroke_Figures_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        try:
+            os.makedirs(outdir, exist_ok=True)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to create output directory: {e}")
+            return
+
+        # Save current selections to restore later
+        try:
+            mean_sel = 0 if self.mean_force_flow_radio.isChecked() else 1 if self.mean_force_sweep_radio.isChecked() else 2
+            mean_channel = self.mean_force_channel.currentText()
+        except Exception:
+            mean_sel = None; mean_channel = None
+        try:
+            peak_sel = 0 if self.peak_flow_radio.isChecked() else 1 if self.peak_sweep_radio.isChecked() else 2
+            peak_channel = self.peak_location_channel.currentText()
+        except Exception:
+            peak_sel = None; peak_channel = None
+        try:
+            vec_sel = 0 if self.vec_flow_radio.isChecked() else 1 if self.vec_sweep_radio.isChecked() else 2
+        except Exception:
+            vec_sel = None
+
+        variable_types = [('Flow', 0), ('Sweep', 1), ('Overlap', 2)]
+        channels = [('Thrust', 'thrust'), ('Lift', 'lift')]
+
+        # Mean plots
+        for vname, vidx in variable_types:
+            try:
+                [self.mean_force_flow_radio, self.mean_force_sweep_radio, self.mean_force_overlap_radio][vidx].setChecked(True)
+                self.update_mean_force_parameter_controls()
+                for cname, _ in channels:
+                    self.mean_force_channel.setCurrentText(cname)
+                    self.plot_mean_force()
+                    wpx = int(float(self.mf_pub_w.text())); hpx = int(float(self.mf_pub_h.text()))
+                    self.mean_force_figure.set_size_inches(wpx/100.0, hpx/100.0)
+                    fname = os.path.join(outdir, f"Mean_{cname}_{vname}.png")
+                    self.mean_force_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            except Exception:
+                continue
+
+        # Peak plots
+        for vname, vidx in variable_types:
+            try:
+                [self.peak_flow_radio, self.peak_sweep_radio, self.peak_overlap_radio][vidx].setChecked(True)
+                self.update_peak_parameter_controls()
+                for cname, _ in channels:
+                    self.peak_location_channel.setCurrentText(cname)
+                    self.plot_peak_location()
+                    wpx = int(float(self.pk_pub_w.text())); hpx = int(float(self.pk_pub_h.text()))
+                    self.peak_location_figure.set_size_inches(wpx/100.0, hpx/100.0)
+                    fname = os.path.join(outdir, f"Peak_{cname}_{vname}.png")
+                    self.peak_location_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            except Exception:
+                continue
+
+        # Vector plots
+        for vname, vidx in variable_types:
+            try:
+                [self.vec_flow_radio, self.vec_sweep_radio, self.vec_overlap_radio][vidx].setChecked(True)
+                self.update_vec_parameter_controls()
+                self.plot_vector()
+                wpx = int(float(self.vec_pub_w.text())); hpx = int(float(self.vec_pub_h.text()))
+                self.vector_figure.set_size_inches(wpx/100.0, hpx/100.0)
+                fname = os.path.join(outdir, f"Vector_{vname}.png")
+                self.vector_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            except Exception:
+                continue
+
+        # Restore selections
+        try:
+            if mean_sel is not None:
+                [self.mean_force_flow_radio, self.mean_force_sweep_radio, self.mean_force_overlap_radio][mean_sel].setChecked(True)
+                if mean_channel:
+                    self.mean_force_channel.setCurrentText(mean_channel)
+        except Exception:
+            pass
+        try:
+            if peak_sel is not None:
+                [self.peak_flow_radio, self.peak_sweep_radio, self.peak_overlap_radio][peak_sel].setChecked(True)
+                if peak_channel:
+                    self.peak_location_channel.setCurrentText(peak_channel)
+        except Exception:
+            pass
+        try:
+            if vec_sel is not None:
+                [self.vec_flow_radio, self.vec_sweep_radio, self.vec_overlap_radio][vec_sel].setChecked(True)
+        except Exception:
+            pass
+        self.statusBar().showMessage(f"Published overview plots to {outdir}")
 
     def _normalize_time_vector(self, time_vector: np.ndarray) -> np.ndarray:
         """Normalize absolute time to the combined stroke phase [0, 1] using [0.75s, 2.25s]."""
@@ -331,12 +522,14 @@ class FullStrokeOverviewGUI(QMainWindow):
             row['pt'].clear()
             row['pt'].addItems(pt_values)
         
-        # Get default values for seeding
-        default_flow = str(self.param_index['flow'][0]) if self.param_index['flow'] else '0.0'
-        default_period = f"{self.param_index['period'][0]:.2f}" if self.param_index['period'] else '2.25'
-        default_roll = str(int(self.param_index['twist'][0])) if self.param_index['twist'] else '0'
-        default_yaws = [str(int(v)) for v in self.param_index['sweep'][:5]]
-        default_pt = f"{self.param_index['overlap'][0]:.2f}" if self.param_index['overlap'] else '0.5'
+        # Default values for seeding per requirements
+        default_flow = str(self.param_index['flow'][0]) if self.param_index['flow'] else '0.1'
+        default_period = '2.25'
+        default_pt = '0.5'
+        # Twist values 0:15:90 for rows 0..6, then repeat/clip
+        twist_series = [str(int(v)) for v in range(0, 91, 15)]  # 0,15,...,90
+        # Sweep fixed to 80 by default
+        default_yaw_value = '80'
         
         default_colors = [
             '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
@@ -350,17 +543,13 @@ class FullStrokeOverviewGUI(QMainWindow):
             if period_values:
                 row['period'].setCurrentText(default_period)
             if roll_values:
-                row['roll'].setCurrentText(default_roll)
+                row['roll'].setCurrentText(twist_series[i] if i < len(twist_series) else twist_series[-1])
             if pt_values:
                 row['pt'].setCurrentText(default_pt)
-            
-            if i < len(default_yaws) and yaw_values:
-                row['yaw'].setCurrentText(default_yaws[i])
-                row['include'].setChecked(True)
-            else:
-                if yaw_values:
-                    row['yaw'].setCurrentText(default_yaws[0] if default_yaws else yaw_values[0])
-                row['include'].setChecked(False)
+            if yaw_values:
+                row['yaw'].setCurrentText(default_yaw_value)
+            # Include first 7 by default
+            row['include'].setChecked(i < 7)
                 
             # Set style defaults
             row['color'].setText(default_colors[i % len(default_colors)])
@@ -489,7 +678,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         legend_auto_var = QCheckBox("Auto")
         legend_auto_var.setChecked(True)
         row_layout.addWidget(legend_auto_var)
-
+        
         # Legend label
         legend_label_var = QLineEdit()
         legend_label_var.setMaximumWidth(150)
@@ -556,6 +745,40 @@ class FullStrokeOverviewGUI(QMainWindow):
         except Exception:
             pass
 
+    def _apply_master_to_rows(self, key_name: str):
+        # Apply master value to all rows if the corresponding Fixed is checked
+        try:
+            fixed_attr = {
+                'flow': 'master_flow_fixed',
+                'period': 'master_period_fixed',
+                'yaw': 'master_yaw_fixed',
+                'roll': 'master_roll_fixed',
+                'pt': 'master_pt_fixed',
+            }[key_name]
+            combo_attr = {
+                'flow': 'master_flow',
+                'period': 'master_period',
+                'yaw': 'master_yaw',
+                'roll': 'master_roll',
+                'pt': 'master_pt',
+            }[key_name]
+        except KeyError:
+            return
+        fixed_cb = getattr(self, fixed_attr, None)
+        master_combo = getattr(self, combo_attr, None)
+        if fixed_cb is None or master_combo is None:
+            return
+        if not fixed_cb.isChecked():
+            return
+        val = master_combo.currentText()
+        for row in self.dataset_rows:
+            try:
+                row[key_name].setCurrentText(val)
+                # keep legend auto label in sync
+                self._update_row_auto_label(row)
+            except Exception:
+                continue
+
     def _wire_row_signals(self, row):
         # When any selector changes and auto is on, update label
         for key in ['flow', 'period', 'yaw', 'roll', 'pt']:
@@ -576,6 +799,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         parent.addWidget(self.tab_widget)
         
         # Create tabs
+        self.create_overview_settings_tab()
         self.create_traces_tab()
         self.create_mean_overview_tab()
         self.create_mean_force_tab()
@@ -753,6 +977,41 @@ class FullStrokeOverviewGUI(QMainWindow):
         sel_frame = QGroupBox("Datasets (up to 10)")
         sel_layout = QVBoxLayout(sel_frame)
         
+        # Master column controls (apply to all rows when fixed)
+        master_frame = QGroupBox("Master Column Controls")
+        master_layout = QGridLayout(master_frame)
+        # Flow
+        self.master_flow_fixed = QCheckBox("Fixed")
+        self.master_flow = QComboBox(); self.master_flow.setMinimumWidth(80)
+        master_layout.addWidget(QLabel("Flow"), 0, 0)
+        master_layout.addWidget(self.master_flow_fixed, 0, 1)
+        master_layout.addWidget(self.master_flow, 0, 2)
+        # Period
+        self.master_period_fixed = QCheckBox("Fixed")
+        self.master_period = QComboBox(); self.master_period.setMinimumWidth(80)
+        master_layout.addWidget(QLabel("Period"), 0, 3)
+        master_layout.addWidget(self.master_period_fixed, 0, 4)
+        master_layout.addWidget(self.master_period, 0, 5)
+        # Sweep
+        self.master_yaw_fixed = QCheckBox("Fixed")
+        self.master_yaw = QComboBox(); self.master_yaw.setMinimumWidth(80)
+        master_layout.addWidget(QLabel("Sweep"), 0, 6)
+        master_layout.addWidget(self.master_yaw_fixed, 0, 7)
+        master_layout.addWidget(self.master_yaw, 0, 8)
+        # Twist
+        self.master_roll_fixed = QCheckBox("Fixed")
+        self.master_roll = QComboBox(); self.master_roll.setMinimumWidth(80)
+        master_layout.addWidget(QLabel("Twist"), 0, 9)
+        master_layout.addWidget(self.master_roll_fixed, 0, 10)
+        master_layout.addWidget(self.master_roll, 0, 11)
+        # Overlap
+        self.master_pt_fixed = QCheckBox("Fixed")
+        self.master_pt = QComboBox(); self.master_pt.setMinimumWidth(80)
+        master_layout.addWidget(QLabel("Overlap"), 0, 12)
+        master_layout.addWidget(self.master_pt_fixed, 0, 13)
+        master_layout.addWidget(self.master_pt, 0, 14)
+        sel_layout.addWidget(master_frame)
+        
         # Create scroll area for dataset selectors
         scroll_area = QScrollArea()
         scroll_widget = QWidget()
@@ -779,6 +1038,19 @@ class FullStrokeOverviewGUI(QMainWindow):
         
         self.tab_widget.addTab(traces_widget, "Trial Traces")
         
+        # Wire master controls behavior
+        def _bind_master(fixed_cb, master_combo, key_name):
+            try:
+                fixed_cb.toggled.connect(lambda _: self._apply_master_to_rows(key_name))
+                master_combo.currentIndexChanged.connect(lambda _: self._apply_master_to_rows(key_name))
+            except Exception:
+                pass
+        _bind_master(self.master_flow_fixed, self.master_flow, 'flow')
+        _bind_master(self.master_period_fixed, self.master_period, 'period')
+        _bind_master(self.master_yaw_fixed, self.master_yaw, 'yaw')
+        _bind_master(self.master_roll_fixed, self.master_roll, 'roll')
+        _bind_master(self.master_pt_fixed, self.master_pt, 'pt')
+        
         
     
         
@@ -791,12 +1063,19 @@ class FullStrokeOverviewGUI(QMainWindow):
                 if not row['include'].isChecked():
                     continue
                 try:
-                    flow = float(row['flow'].currentText())
-                    period = float(row['period'].currentText())
-                    yaw = float(row['yaw'].currentText())   # sweep (absolute)
-                    roll = float(row['roll'].currentText()) # twist (absolute)
+                    # Use master values when the corresponding Fixed is checked
+                    flow_text = self.master_flow.currentText() if getattr(self, 'master_flow_fixed', None) and self.master_flow_fixed.isChecked() else row['flow'].currentText()
+                    period_text = self.master_period.currentText() if getattr(self, 'master_period_fixed', None) and self.master_period_fixed.isChecked() else row['period'].currentText()
+                    yaw_text = self.master_yaw.currentText() if getattr(self, 'master_yaw_fixed', None) and self.master_yaw_fixed.isChecked() else row['yaw'].currentText()
+                    roll_text = self.master_roll.currentText() if getattr(self, 'master_roll_fixed', None) and self.master_roll_fixed.isChecked() else row['roll'].currentText()
+                    pt_text = self.master_pt.currentText() if getattr(self, 'master_pt_fixed', None) and self.master_pt_fixed.isChecked() else row['pt'].currentText()
+
+                    flow = float(flow_text)
+                    period = float(period_text)
+                    yaw = float(yaw_text)   # sweep (absolute)
+                    roll = float(roll_text) # twist (absolute)
                     try:
-                        pt = float(row['pt'].currentText()) if row['pt'].currentText() != '' else None
+                        pt = float(pt_text) if pt_text != '' else None
                     except Exception:
                         pt = None
                 except ValueError:
@@ -1035,9 +1314,16 @@ class FullStrokeOverviewGUI(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # Variable Selection (decoupled from Trial Traces)
+        # Compact top controls panel
+        top_panel = QWidget()
+        top_layout = QHBoxLayout(top_panel)
+        top_layout.setContentsMargins(5, 5, 5, 5)
+        top_layout.setSpacing(10)
+
+        # Variable Selection (compact horizontal)
         var_frame = QGroupBox("Variable Selection")
-        var_layout = QVBoxLayout(var_frame)
+        var_layout = QHBoxLayout(var_frame)
+        var_layout.setContentsMargins(5, 5, 5, 5)
         
         self.mean_force_variable_group = QButtonGroup()
         self.mean_force_flow_radio = QRadioButton("Flow")
@@ -1049,112 +1335,209 @@ class FullStrokeOverviewGUI(QMainWindow):
         self.mean_force_variable_group.addButton(self.mean_force_overlap_radio, 2)
         self.mean_force_flow_radio.setChecked(True)
         
-        mf_radio_layout = QHBoxLayout()
-        mf_radio_layout.addWidget(self.mean_force_flow_radio)
-        mf_radio_layout.addWidget(self.mean_force_sweep_radio)
-        mf_radio_layout.addWidget(self.mean_force_overlap_radio)
-        mf_radio_layout.addStretch()
-        var_layout.addLayout(mf_radio_layout)
-        
+        # Connect radio button changes to update controls
         self.mean_force_variable_group.buttonClicked.connect(self.update_mean_force_parameter_controls)
-        layout.addWidget(var_frame)
         
-        # Fixed Parameters Display
+        var_layout.addWidget(self.mean_force_flow_radio)
+        var_layout.addWidget(self.mean_force_sweep_radio)
+        var_layout.addWidget(self.mean_force_overlap_radio)
+        top_layout.addWidget(var_frame)
+        
+        # Fixed Parameters Display (compact)
         mf_fixed_frame = QGroupBox("Fixed Parameters")
         mf_fixed_layout = QHBoxLayout(mf_fixed_frame)
+        mf_fixed_layout.setContentsMargins(5, 5, 5, 5)
         self.mean_force_fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
         mf_fixed_layout.addWidget(self.mean_force_fixed_params_label)
-        mf_fixed_layout.addStretch()
-        layout.addWidget(mf_fixed_frame)
+        top_layout.addWidget(mf_fixed_frame)
         
-        # Variable Parameter Controls (per value marker + toggle)
-        self.mean_force_var_controls_frame = QGroupBox("Variable Parameter Controls")
-        self.mean_force_var_controls_layout = QVBoxLayout(self.mean_force_var_controls_frame)
-        self.mean_force_parameter_controls = {}
-        layout.addWidget(self.mean_force_var_controls_frame)
-        
-        # Plot Controls
-        control_frame = QFrame()
-        control_layout = QHBoxLayout(control_frame)
-        
-        control_layout.addWidget(QLabel("Channel:"))
+        # Plot controls (compact horizontal)
+        plot_control_frame = QGroupBox("Plot Control Panel")
+        plot_control_layout = QHBoxLayout(plot_control_frame)
+        plot_control_layout.setContentsMargins(5, 5, 5, 5)
+        plot_control_layout.addWidget(QLabel("Channel:"))
         self.mean_force_channel = QComboBox()
         self.mean_force_channel.addItems(["Thrust", "Lift"])
         self.mean_force_channel.setCurrentText("Thrust")
-        control_layout.addWidget(self.mean_force_channel)
-        
+        plot_control_layout.addWidget(self.mean_force_channel)
         self.plot_mean_force_button = QPushButton("Plot Mean Force")
         self.plot_mean_force_button.clicked.connect(self.plot_mean_force)
         self.plot_mean_force_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
-        control_layout.addWidget(self.plot_mean_force_button)
+        plot_control_layout.addWidget(self.plot_mean_force_button)
+        top_layout.addWidget(plot_control_frame)
         
-        control_layout.addStretch()
-        layout.addWidget(control_frame)
+        # Variable Parameter Controls (per value marker + toggle)
+        self.mean_force_var_controls_frame = QGroupBox("Variable Parameter Controls")
+        self.mean_force_var_controls_layout = QHBoxLayout(self.mean_force_var_controls_frame)
+        self.mean_force_var_controls_layout.setContentsMargins(5, 5, 5, 5)
+        self.mean_force_parameter_controls = {}
+        
+        # Compact middle controls panel
+        middle_panel = QWidget()
+        middle_layout = QHBoxLayout(middle_panel)
+        middle_layout.setContentsMargins(5, 5, 5, 5)
+        middle_layout.setSpacing(10)
 
-        # Publish controls
+        # Publish controls (compact)
         pub_frame = QGroupBox("Publish")
-        pub_layout = QGridLayout(pub_frame)
+        pub_layout = QHBoxLayout(pub_frame)
+        pub_layout.setContentsMargins(5, 5, 5, 5)
+        pub_layout.addWidget(QLabel("W(px)"))
         self.mf_pub_w = QLineEdit("1200")
+        self.mf_pub_w.setMaximumWidth(60)
+        pub_layout.addWidget(self.mf_pub_w)
+        pub_layout.addWidget(QLabel("H(px)"))
         self.mf_pub_h = QLineEdit("800")
+        self.mf_pub_h.setMaximumWidth(60)
+        pub_layout.addWidget(self.mf_pub_h)
+        pub_layout.addWidget(QLabel("Name"))
         self.mf_pub_name = QLineEdit("MeanForce_plot.png")
-        pub_layout.addWidget(QLabel("W(px)"), 0, 0)
-        pub_layout.addWidget(self.mf_pub_w, 0, 1)
-        pub_layout.addWidget(QLabel("H(px)"), 0, 2)
-        pub_layout.addWidget(self.mf_pub_h, 0, 3)
-        pub_layout.addWidget(QLabel("Name"), 1, 0)
-        pub_layout.addWidget(self.mf_pub_name, 1, 1, 1, 3)
+        self.mf_pub_name.setMaximumWidth(150)
+        pub_layout.addWidget(self.mf_pub_name)
         mf_pub_button = QPushButton("Publish PNG")
         mf_pub_button.clicked.connect(self.publish_mean_force_figure)
-        pub_layout.addWidget(mf_pub_button, 0, 4, 2, 1)
-        layout.addWidget(pub_frame)
+        pub_layout.addWidget(mf_pub_button)
+        middle_layout.addWidget(pub_frame)
 
-        # Axes & Legend Controls (similar to Traces tab)
+        # Axes & Legend Controls (compact horizontal)
         axes_frame = QGroupBox("Axes and Legend")
-        axes_layout = QGridLayout(axes_frame)
-        # Axis limits
-        axes_layout.addWidget(QLabel("X min"), 0, 0)
+        axes_layout = QHBoxLayout(axes_frame)
+        axes_layout.setContentsMargins(5, 5, 5, 5)
+        axes_layout.addWidget(QLabel("X min"))
         self.mf_xmin = QLineEdit("")
         self.mf_xmin.setPlaceholderText("auto")
-        axes_layout.addWidget(self.mf_xmin, 0, 1)
-        axes_layout.addWidget(QLabel("X max"), 0, 2)
+        self.mf_xmin.setMaximumWidth(60)
+        axes_layout.addWidget(self.mf_xmin)
+        axes_layout.addWidget(QLabel("X max"))
         self.mf_xmax = QLineEdit("")
         self.mf_xmax.setPlaceholderText("auto")
-        axes_layout.addWidget(self.mf_xmax, 0, 3)
-        axes_layout.addWidget(QLabel("Y min"), 1, 0)
+        self.mf_xmax.setMaximumWidth(60)
+        axes_layout.addWidget(self.mf_xmax)
+        axes_layout.addWidget(QLabel("Y min"))
         self.mf_ymin = QLineEdit("")
         self.mf_ymin.setPlaceholderText("auto")
-        axes_layout.addWidget(self.mf_ymin, 1, 1)
-        axes_layout.addWidget(QLabel("Y max"), 1, 2)
+        self.mf_ymin.setMaximumWidth(60)
+        axes_layout.addWidget(self.mf_ymin)
+        axes_layout.addWidget(QLabel("Y max"))
         self.mf_ymax = QLineEdit("")
         self.mf_ymax.setPlaceholderText("auto")
-        axes_layout.addWidget(self.mf_ymax, 1, 3)
-        # Labels
-        self.mf_title_on = QCheckBox("Title")
-        self.mf_title_text = QLineEdit("")
-        axes_layout.addWidget(self.mf_title_on, 2, 0)
-        axes_layout.addWidget(self.mf_title_text, 2, 1, 1, 3)
-        self.mf_xlabel_on = QCheckBox("X Label")
-        self.mf_xlabel_text = QLineEdit("Absolute Twist (degrees)")
-        axes_layout.addWidget(self.mf_xlabel_on, 3, 0)
-        axes_layout.addWidget(self.mf_xlabel_text, 3, 1, 1, 3)
-        self.mf_ylabel_on = QCheckBox("Y Label")
-        self.mf_ylabel_text = QLineEdit("Mean Thrust Force (N)")
-        axes_layout.addWidget(self.mf_ylabel_on, 4, 0)
-        axes_layout.addWidget(self.mf_ylabel_text, 4, 1, 1, 3)
-        # Legend
+        self.mf_ymax.setMaximumWidth(60)
+        axes_layout.addWidget(self.mf_ymax)
+        axes_layout.addWidget(QLabel("Tick font"))
+        self.mf_tick_font = QComboBox()
+        self.mf_tick_font.addItems(['Default','DejaVu Sans','Arial','Calibri','Times New Roman','Helvetica'])
+        self.mf_tick_font.setMaximumWidth(100)
+        axes_layout.addWidget(self.mf_tick_font)
         self.mf_legend_on = QCheckBox("Legend")
-        axes_layout.addWidget(self.mf_legend_on, 5, 0)
-        axes_layout.addWidget(QLabel("Loc"), 5, 1)
+        axes_layout.addWidget(self.mf_legend_on)
         self.mf_legend_loc = QComboBox()
         self.mf_legend_loc.addItems(["best","upper right","upper left","lower left","lower right","right","center left","center right","lower center","upper center","center"]) 
         self.mf_legend_loc.setCurrentText("best")
-        axes_layout.addWidget(self.mf_legend_loc, 5, 2)
-        layout.addWidget(axes_frame)
-        
-        # Create matplotlib figure for mean force
+        self.mf_legend_loc.setMaximumWidth(80)
+        axes_layout.addWidget(QLabel("Loc"))
+        axes_layout.addWidget(self.mf_legend_loc)
+        middle_layout.addWidget(axes_frame)
+
+        # Additional controls panel (for missing elements)
+        additional_panel = QWidget()
+        additional_layout = QHBoxLayout(additional_panel)
+        additional_layout.setContentsMargins(5, 5, 5, 5)
+        additional_layout.setSpacing(10)
+
+        # Title controls
+        title_frame = QGroupBox("Title")
+        title_layout = QHBoxLayout(title_frame)
+        title_layout.setContentsMargins(5, 5, 5, 5)
+        self.mf_title_on = QCheckBox("Title")
+        title_layout.addWidget(self.mf_title_on)
+        self.mf_title_text = QLineEdit("")
+        self.mf_title_text.setPlaceholderText("auto")
+        self.mf_title_text.setMaximumWidth(150)
+        title_layout.addWidget(self.mf_title_text)
+        additional_layout.addWidget(title_frame)
+
+        # X Label controls
+        xlabel_frame = QGroupBox("X Label")
+        xlabel_layout = QHBoxLayout(xlabel_frame)
+        xlabel_layout.setContentsMargins(5, 5, 5, 5)
+        self.mf_xlabel_on = QCheckBox("X Label")
+        xlabel_layout.addWidget(self.mf_xlabel_on)
+        self.mf_xlabel_text = QLineEdit("Absolute Twist (degrees)")
+        self.mf_xlabel_text.setMaximumWidth(150)
+        xlabel_layout.addWidget(self.mf_xlabel_text)
+        additional_layout.addWidget(xlabel_frame)
+
+        # Y Label controls
+        ylabel_frame = QGroupBox("Y Label")
+        ylabel_layout = QHBoxLayout(ylabel_frame)
+        ylabel_layout.setContentsMargins(5, 5, 5, 5)
+        self.mf_ylabel_on = QCheckBox("Y Label")
+        ylabel_layout.addWidget(self.mf_ylabel_on)
+        self.mf_ylabel_text = QLineEdit("Mean Thrust Force (N)")
+        self.mf_ylabel_text.setMaximumWidth(150)
+        ylabel_layout.addWidget(self.mf_ylabel_text)
+        additional_layout.addWidget(ylabel_frame)
+
+        # Tick step controls
+        tick_frame = QGroupBox("Tick Steps")
+        tick_layout = QHBoxLayout(tick_frame)
+        tick_layout.setContentsMargins(5, 5, 5, 5)
+        tick_layout.addWidget(QLabel("X step"))
+        self.mf_xtick_step = QLineEdit("")
+        self.mf_xtick_step.setPlaceholderText("auto")
+        self.mf_xtick_step.setMaximumWidth(60)
+        tick_layout.addWidget(self.mf_xtick_step)
+        tick_layout.addWidget(QLabel("Y step"))
+        self.mf_ytick_step = QLineEdit("")
+        self.mf_ytick_step.setPlaceholderText("auto")
+        self.mf_ytick_step.setMaximumWidth(60)
+        tick_layout.addWidget(self.mf_ytick_step)
+        tick_layout.addWidget(QLabel("Tick size"))
+        self.mf_tick_fs = QLineEdit("")
+        self.mf_tick_fs.setPlaceholderText("auto")
+        self.mf_tick_fs.setMaximumWidth(60)
+        tick_layout.addWidget(self.mf_tick_fs)
+        additional_layout.addWidget(tick_frame)
+
+        # Marker style controls (compact horizontal)
+        marker_frame = QGroupBox("Marker Style")
+        marker_layout = QHBoxLayout(marker_frame)
+        marker_layout.setContentsMargins(5, 5, 5, 5)
+        marker_layout.addWidget(QLabel("Size"))
+        self.mf_marker_size = QLineEdit("50")
+        self.mf_marker_size.setMaximumWidth(50)
+        marker_layout.addWidget(self.mf_marker_size)
+        marker_layout.addWidget(QLabel("Edge color"))
+        self.mf_marker_edge_color = QLineEdit("#000000")
+        self.mf_marker_edge_color.setMaximumWidth(80)
+        marker_layout.addWidget(self.mf_marker_edge_color)
+        marker_layout.addWidget(QLabel("Edge width"))
+        self.mf_marker_edge_width = QLineEdit("0.4")
+        self.mf_marker_edge_width.setMaximumWidth(50)
+        marker_layout.addWidget(self.mf_marker_edge_width)
+        self.mf_grid_on = QCheckBox("Grid")
+        self.mf_grid_on.setChecked(True)
+        marker_layout.addWidget(self.mf_grid_on)
+        middle_layout.addWidget(marker_frame)
+
+        # Assemble controls panel
+        panel_widget = QWidget()
+        panel_layout = QVBoxLayout(panel_widget)
+        panel_layout.setContentsMargins(0,0,0,0)
+        panel_layout.setSpacing(5)
+        panel_layout.addWidget(top_panel)
+        panel_layout.addWidget(self.mean_force_var_controls_frame)
+        panel_layout.addWidget(middle_panel)
+        panel_layout.addWidget(additional_panel)
+
+        # Create matplotlib figure for mean force below in splitter for larger plot area (50/50 split)
         self.mean_force_figure = Figure(figsize=(12, 8))
         self.mean_force_canvas = FigureCanvas(self.mean_force_figure)
-        layout.addWidget(self.mean_force_canvas)
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(panel_widget)
+        splitter.addWidget(self.mean_force_canvas)
+        splitter.setSizes([400, 400])  # 50/50 split instead of 300/900
+        layout.addWidget(splitter)
         
         # Seed parameter controls
         self.update_mean_force_parameter_controls()
@@ -1166,9 +1549,16 @@ class FullStrokeOverviewGUI(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # Variable Selection (matches Mean Force tab)
+        # Compact top controls panel
+        top_panel = QWidget()
+        top_layout = QHBoxLayout(top_panel)
+        top_layout.setContentsMargins(5, 5, 5, 5)
+        top_layout.setSpacing(10)
+
+        # Variable Selection (compact horizontal)
         var_frame = QGroupBox("Variable Selection")
         var_layout = QHBoxLayout(var_frame)
+        var_layout.setContentsMargins(5, 5, 5, 5)
         self.peak_variable_group = QButtonGroup()
         self.peak_flow_radio = QRadioButton("Flow")
         self.peak_sweep_radio = QRadioButton("Sweep")
@@ -1180,87 +1570,169 @@ class FullStrokeOverviewGUI(QMainWindow):
         var_layout.addWidget(self.peak_flow_radio)
         var_layout.addWidget(self.peak_sweep_radio)
         var_layout.addWidget(self.peak_overlap_radio)
-        var_layout.addStretch()
-        layout.addWidget(var_frame)
+        top_layout.addWidget(var_frame)
 
-        # Fixed Parameters label
+        # Fixed Parameters (compact)
         peak_fixed = QGroupBox("Fixed Parameters")
         peak_fixed_layout = QHBoxLayout(peak_fixed)
+        peak_fixed_layout.setContentsMargins(5, 5, 5, 5)
         self.peak_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
         peak_fixed_layout.addWidget(self.peak_fixed_params_label)
-        peak_fixed_layout.addStretch()
-        layout.addWidget(peak_fixed)
+        top_layout.addWidget(peak_fixed)
+
+        # Plot controls (compact horizontal)
+        plot_control_frame = QGroupBox("Plot Control Panel")
+        plot_control_layout = QHBoxLayout(plot_control_frame)
+        plot_control_layout.setContentsMargins(5, 5, 5, 5)
+        plot_control_layout.addWidget(QLabel("Channel:"))
+        self.peak_location_channel = QComboBox()
+        self.peak_location_channel.addItems(["Thrust", "Lift"])
+        self.peak_location_channel.setCurrentText("Thrust")
+        plot_control_layout.addWidget(self.peak_location_channel)
+        self.plot_peak_location_button = QPushButton("Plot Peak Location")
+        self.plot_peak_location_button.clicked.connect(self.plot_peak_location)
+        self.plot_peak_location_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
+        plot_control_layout.addWidget(self.plot_peak_location_button)
+        top_layout.addWidget(plot_control_frame)
 
         # Variable Parameter Controls (marker style + toggle per value)
         self.peak_var_controls_frame = QGroupBox("Variable Parameter Controls")
         self.peak_var_controls_layout = QVBoxLayout(self.peak_var_controls_frame)
-        layout.addWidget(self.peak_var_controls_frame)
+        self.peak_var_controls_layout.setContentsMargins(5, 5, 5, 5)
         self.peak_parameter_controls = {}
 
-        # Controls: channel and plot
-        control_frame = QFrame()
-        control_layout = QHBoxLayout(control_frame)
-        control_layout.addWidget(QLabel("Channel:"))
-        self.peak_location_channel = QComboBox()
-        self.peak_location_channel.addItems(["Thrust", "Lift"])
-        self.peak_location_channel.setCurrentText("Thrust")
-        control_layout.addWidget(self.peak_location_channel)
-        self.plot_peak_location_button = QPushButton("Plot Peak Location")
-        self.plot_peak_location_button.clicked.connect(self.plot_peak_location)
-        self.plot_peak_location_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
-        control_layout.addWidget(self.plot_peak_location_button)
-        control_layout.addStretch()
-        layout.addWidget(control_frame)
+        # Compact middle controls panel
+        middle_panel = QWidget()
+        middle_layout = QHBoxLayout(middle_panel)
+        middle_layout.setContentsMargins(5, 5, 5, 5)
+        middle_layout.setSpacing(10)
 
-        # Publish controls
+        # Publish controls (compact)
         pub_frame = QGroupBox("Publish")
-        pub_layout = QGridLayout(pub_frame)
+        pub_layout = QHBoxLayout(pub_frame)
+        pub_layout.setContentsMargins(5, 5, 5, 5)
+        pub_layout.addWidget(QLabel("W(px)"))
         self.pk_pub_w = QLineEdit("1200")
+        self.pk_pub_w.setMaximumWidth(60)
+        pub_layout.addWidget(self.pk_pub_w)
+        pub_layout.addWidget(QLabel("H(px)"))
         self.pk_pub_h = QLineEdit("800")
+        self.pk_pub_h.setMaximumWidth(60)
+        pub_layout.addWidget(self.pk_pub_h)
+        pub_layout.addWidget(QLabel("Name"))
         self.pk_pub_name = QLineEdit("PeakLocation_plot.png")
-        pub_layout.addWidget(QLabel("W(px)"), 0, 0)
-        pub_layout.addWidget(self.pk_pub_w, 0, 1)
-        pub_layout.addWidget(QLabel("H(px)"), 0, 2)
-        pub_layout.addWidget(self.pk_pub_h, 0, 3)
-        pub_layout.addWidget(QLabel("Name"), 1, 0)
-        pub_layout.addWidget(self.pk_pub_name, 1, 1, 1, 3)
+        self.pk_pub_name.setMaximumWidth(150)
+        pub_layout.addWidget(self.pk_pub_name)
         pk_pub_button = QPushButton("Publish PNG")
         pk_pub_button.clicked.connect(self.publish_peak_location_figure)
-        pub_layout.addWidget(pk_pub_button, 0, 4, 2, 1)
-        layout.addWidget(pub_frame)
+        pub_layout.addWidget(pk_pub_button)
+        middle_layout.addWidget(pub_frame)
 
-        # Axes and legend controls (compact)
+        # Axes and legend controls (compact horizontal)
         axes_frame = QGroupBox("Axes and Legend")
-        axes_layout = QGridLayout(axes_frame)
-        axes_layout.addWidget(QLabel("X min"), 0, 0)
+        axes_layout = QHBoxLayout(axes_frame)
+        axes_layout.setContentsMargins(5, 5, 5, 5)
+        axes_layout.addWidget(QLabel("X min"))
         self.pk_xmin = QLineEdit("")
         self.pk_xmin.setPlaceholderText("auto")
-        axes_layout.addWidget(self.pk_xmin, 0, 1)
-        axes_layout.addWidget(QLabel("X max"), 0, 2)
+        self.pk_xmin.setMaximumWidth(60)
+        axes_layout.addWidget(self.pk_xmin)
+        axes_layout.addWidget(QLabel("X max"))
         self.pk_xmax = QLineEdit("")
         self.pk_xmax.setPlaceholderText("auto")
-        axes_layout.addWidget(self.pk_xmax, 0, 3)
-        axes_layout.addWidget(QLabel("Y min"), 1, 0)
+        self.pk_xmax.setMaximumWidth(60)
+        axes_layout.addWidget(self.pk_xmax)
+        axes_layout.addWidget(QLabel("Y min"))
         self.pk_ymin = QLineEdit("")
         self.pk_ymin.setPlaceholderText("auto")
-        axes_layout.addWidget(self.pk_ymin, 1, 1)
-        axes_layout.addWidget(QLabel("Y max"), 1, 2)
+        self.pk_ymin.setMaximumWidth(60)
+        axes_layout.addWidget(self.pk_ymin)
+        axes_layout.addWidget(QLabel("Y max"))
         self.pk_ymax = QLineEdit("")
         self.pk_ymax.setPlaceholderText("auto")
-        axes_layout.addWidget(self.pk_ymax, 1, 3)
+        self.pk_ymax.setMaximumWidth(60)
+        axes_layout.addWidget(self.pk_ymax)
+        axes_layout.addWidget(QLabel("Tick font"))
+        self.pk_tick_font = QComboBox()
+        self.pk_tick_font.addItems(['Default','DejaVu Sans','Arial','Calibri','Times New Roman','Helvetica'])
+        self.pk_tick_font.setMaximumWidth(100)
+        axes_layout.addWidget(self.pk_tick_font)
         self.pk_legend_on = QCheckBox("Legend")
-        axes_layout.addWidget(self.pk_legend_on, 2, 0)
+        axes_layout.addWidget(self.pk_legend_on)
         self.pk_legend_loc = QComboBox()
         self.pk_legend_loc.addItems(["best","upper right","upper left","lower left","lower right","right","center left","center right","lower center","upper center","center"]) 
         self.pk_legend_loc.setCurrentText("best")
-        axes_layout.addWidget(QLabel("Loc"), 2, 1)
-        axes_layout.addWidget(self.pk_legend_loc, 2, 2)
-        layout.addWidget(axes_frame)
+        self.pk_legend_loc.setMaximumWidth(80)
+        axes_layout.addWidget(QLabel("Loc"))
+        axes_layout.addWidget(self.pk_legend_loc)
+        middle_layout.addWidget(axes_frame)
 
-        # Figure
+        # Marker styling (compact horizontal)
+        marker_frame = QGroupBox("Marker Style")
+        marker_layout = QHBoxLayout(marker_frame)
+        marker_layout.setContentsMargins(5, 5, 5, 5)
+        marker_layout.addWidget(QLabel("Size"))
+        self.pk_marker_size = QLineEdit("60")
+        self.pk_marker_size.setMaximumWidth(50)
+        marker_layout.addWidget(self.pk_marker_size)
+        marker_layout.addWidget(QLabel("Edge color"))
+        self.pk_marker_edge_color = QLineEdit("#000000")
+        self.pk_marker_edge_color.setMaximumWidth(80)
+        marker_layout.addWidget(self.pk_marker_edge_color)
+        marker_layout.addWidget(QLabel("Edge width"))
+        self.pk_marker_edge_width = QLineEdit("0.4")
+        self.pk_marker_edge_width.setMaximumWidth(50)
+        marker_layout.addWidget(self.pk_marker_edge_width)
+        self.pk_grid_on = QCheckBox("Grid")
+        self.pk_grid_on.setChecked(True)
+        marker_layout.addWidget(self.pk_grid_on)
+        middle_layout.addWidget(marker_frame)
+
+        # Additional controls panel (for missing elements)
+        additional_panel = QWidget()
+        additional_layout = QHBoxLayout(additional_panel)
+        additional_layout.setContentsMargins(5, 5, 5, 5)
+        additional_layout.setSpacing(10)
+
+        # Tick step controls
+        tick_frame = QGroupBox("Tick Steps")
+        tick_layout = QHBoxLayout(tick_frame)
+        tick_layout.setContentsMargins(5, 5, 5, 5)
+        tick_layout.addWidget(QLabel("X step"))
+        self.pk_xtick_step = QLineEdit("")
+        self.pk_xtick_step.setPlaceholderText("auto")
+        self.pk_xtick_step.setMaximumWidth(60)
+        tick_layout.addWidget(self.pk_xtick_step)
+        tick_layout.addWidget(QLabel("Y step"))
+        self.pk_ytick_step = QLineEdit("")
+        self.pk_ytick_step.setPlaceholderText("auto")
+        self.pk_ytick_step.setMaximumWidth(60)
+        tick_layout.addWidget(self.pk_ytick_step)
+        tick_layout.addWidget(QLabel("Tick size"))
+        self.pk_tick_fs = QLineEdit("")
+        self.pk_tick_fs.setPlaceholderText("auto")
+        self.pk_tick_fs.setMaximumWidth(60)
+        tick_layout.addWidget(self.pk_tick_fs)
+        additional_layout.addWidget(tick_frame)
+
+        # Assemble controls panel
+        panel_widget = QWidget()
+        panel_layout = QVBoxLayout(panel_widget)
+        panel_layout.setContentsMargins(0,0,0,0)
+        panel_layout.setSpacing(5)
+        panel_layout.addWidget(top_panel)
+        panel_layout.addWidget(self.peak_var_controls_frame)
+        panel_layout.addWidget(middle_panel)
+        panel_layout.addWidget(additional_panel)
+
+        # Figure in splitter for larger plot (50/50 split)
         self.peak_location_figure = Figure(figsize=(12, 8))
         self.peak_location_canvas = FigureCanvas(self.peak_location_figure)
-        layout.addWidget(self.peak_location_canvas)
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(panel_widget)
+        splitter.addWidget(self.peak_location_canvas)
+        splitter.setSizes([400, 400])  # 50/50 split instead of 300/900
+        layout.addWidget(splitter)
 
         # Wire variable group to rebuild controls
         self.peak_variable_group.buttonClicked.connect(self.update_peak_parameter_controls)
@@ -1316,9 +1788,16 @@ class FullStrokeOverviewGUI(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # Variable Selection (Flow/Sweep/Overlap)
+        # Compact top controls panel
+        top_panel = QWidget()
+        top_layout = QHBoxLayout(top_panel)
+        top_layout.setContentsMargins(5, 5, 5, 5)
+        top_layout.setSpacing(10)
+
+        # Variable Selection (compact horizontal)
         var_frame = QGroupBox("Variable Selection")
         var_layout = QHBoxLayout(var_frame)
+        var_layout.setContentsMargins(5, 5, 5, 5)
         self.vec_variable_group = QButtonGroup()
         self.vec_flow_radio = QRadioButton("Flow")
         self.vec_sweep_radio = QRadioButton("Sweep")
@@ -1330,79 +1809,122 @@ class FullStrokeOverviewGUI(QMainWindow):
         var_layout.addWidget(self.vec_flow_radio)
         var_layout.addWidget(self.vec_sweep_radio)
         var_layout.addWidget(self.vec_overlap_radio)
-        var_layout.addStretch()
-        layout.addWidget(var_frame)
+        top_layout.addWidget(var_frame)
 
-        # Fixed params label
+        # Fixed params label (compact)
         vec_fixed = QGroupBox("Fixed Parameters")
         vec_fixed_layout = QHBoxLayout(vec_fixed)
+        vec_fixed_layout.setContentsMargins(5, 5, 5, 5)
         self.vec_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
         vec_fixed_layout.addWidget(self.vec_fixed_params_label)
-        vec_fixed_layout.addStretch()
-        layout.addWidget(vec_fixed)
+        top_layout.addWidget(vec_fixed)
+
+        # Plot controls (compact horizontal)
+        plot_control_frame = QGroupBox("Plot Control Panel")
+        plot_control_layout = QHBoxLayout(plot_control_frame)
+        plot_control_layout.setContentsMargins(5, 5, 5, 5)
+        self.plot_vector_button = QPushButton("Plot Vector")
+        self.plot_vector_button.clicked.connect(self.plot_vector)
+        self.plot_vector_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
+        plot_control_layout.addWidget(self.plot_vector_button)
+        plot_control_layout.addWidget(QLabel("Arrow LW"))
+        self.vec_arrow_lw = QLineEdit("1.5")
+        self.vec_arrow_lw.setMaximumWidth(50)
+        plot_control_layout.addWidget(self.vec_arrow_lw)
+        plot_control_layout.addWidget(QLabel("Head W"))
+        self.vec_head_w = QLineEdit("0.01")
+        self.vec_head_w.setMaximumWidth(50)
+        plot_control_layout.addWidget(self.vec_head_w)
+        plot_control_layout.addWidget(QLabel("Head L"))
+        self.vec_head_l = QLineEdit("0.02")
+        self.vec_head_l.setMaximumWidth(50)
+        plot_control_layout.addWidget(self.vec_head_l)
+        top_layout.addWidget(plot_control_frame)
 
         # Variable Parameter Controls (style toggle)
         self.vec_var_controls_frame = QGroupBox("Variable Parameter Controls")
         self.vec_var_controls_layout = QVBoxLayout(self.vec_var_controls_frame)
+        self.vec_var_controls_layout.setContentsMargins(5, 5, 5, 5)
         self.vec_parameter_controls = {}
-        layout.addWidget(self.vec_var_controls_frame)
 
-        # Plot controls: arrow thickness/head and axes
-        control_frame = QGroupBox("Plot Controls")
-        control_layout = QGridLayout(control_frame)
-        self.plot_vector_button = QPushButton("Plot Vector")
-        self.plot_vector_button.clicked.connect(self.plot_vector)
-        self.plot_vector_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
-        control_layout.addWidget(self.plot_vector_button, 0, 0)
-        control_layout.addWidget(QLabel("Arrow LW"), 0, 1)
-        self.vec_arrow_lw = QLineEdit("1.5")
-        control_layout.addWidget(self.vec_arrow_lw, 0, 2)
-        control_layout.addWidget(QLabel("Head W"), 0, 3)
-        self.vec_head_w = QLineEdit("0.01")
-        control_layout.addWidget(self.vec_head_w, 0, 4)
-        control_layout.addWidget(QLabel("Head L"), 0, 5)
-        self.vec_head_l = QLineEdit("0.02")
-        control_layout.addWidget(self.vec_head_l, 0, 6)
-        # Axes limits
-        control_layout.addWidget(QLabel("X min"), 1, 1)
-        self.v_xmin = QLineEdit("")
-        self.v_xmin.setPlaceholderText("auto")
-        control_layout.addWidget(self.v_xmin, 1, 2)
-        control_layout.addWidget(QLabel("X max"), 1, 3)
-        self.v_xmax = QLineEdit("")
-        self.v_xmax.setPlaceholderText("auto")
-        control_layout.addWidget(self.v_xmax, 1, 4)
-        control_layout.addWidget(QLabel("Y min"), 1, 5)
-        self.v_ymin = QLineEdit("")
-        self.v_ymin.setPlaceholderText("auto")
-        control_layout.addWidget(self.v_ymin, 1, 6)
-        control_layout.addWidget(QLabel("Y max"), 1, 7)
-        self.v_ymax = QLineEdit("")
-        self.v_ymax.setPlaceholderText("auto")
-        control_layout.addWidget(self.v_ymax, 1, 8)
-        layout.addWidget(control_frame)
+        # Compact middle controls panel
+        middle_panel = QWidget()
+        middle_layout = QHBoxLayout(middle_panel)
+        middle_layout.setContentsMargins(5, 5, 5, 5)
+        middle_layout.setSpacing(10)
 
-        # Publish controls
+        # Publish controls (compact)
         pub_frame = QGroupBox("Publish")
-        pub_layout = QGridLayout(pub_frame)
+        pub_layout = QHBoxLayout(pub_frame)
+        pub_layout.setContentsMargins(5, 5, 5, 5)
+        pub_layout.addWidget(QLabel("W(px)"))
         self.vec_pub_w = QLineEdit("1200")
+        self.vec_pub_w.setMaximumWidth(60)
+        pub_layout.addWidget(self.vec_pub_w)
+        pub_layout.addWidget(QLabel("H(px)"))
         self.vec_pub_h = QLineEdit("800")
+        self.vec_pub_h.setMaximumWidth(60)
+        pub_layout.addWidget(self.vec_pub_h)
+        pub_layout.addWidget(QLabel("Name"))
         self.vec_pub_name = QLineEdit("Vector_plot.png")
-        pub_layout.addWidget(QLabel("W(px)"), 0, 0)
-        pub_layout.addWidget(self.vec_pub_w, 0, 1)
-        pub_layout.addWidget(QLabel("H(px)"), 0, 2)
-        pub_layout.addWidget(self.vec_pub_h, 0, 3)
-        pub_layout.addWidget(QLabel("Name"), 1, 0)
-        pub_layout.addWidget(self.vec_pub_name, 1, 1, 1, 3)
+        self.vec_pub_name.setMaximumWidth(150)
+        pub_layout.addWidget(self.vec_pub_name)
         vec_pub_button = QPushButton("Publish PNG")
         vec_pub_button.clicked.connect(self.publish_vector_figure)
-        pub_layout.addWidget(vec_pub_button, 0, 4, 2, 1)
-        layout.addWidget(pub_frame)
-        
-        # Create matplotlib figure for vector plot
+        pub_layout.addWidget(vec_pub_button)
+        middle_layout.addWidget(pub_frame)
+
+        # Axes and controls (compact horizontal)
+        axes_frame = QGroupBox("Axes and Controls")
+        axes_layout = QHBoxLayout(axes_frame)
+        axes_layout.setContentsMargins(5, 5, 5, 5)
+        axes_layout.addWidget(QLabel("X min"))
+        self.v_xmin = QLineEdit("")
+        self.v_xmin.setPlaceholderText("auto")
+        self.v_xmin.setMaximumWidth(60)
+        axes_layout.addWidget(self.v_xmin)
+        axes_layout.addWidget(QLabel("X max"))
+        self.v_xmax = QLineEdit("")
+        self.v_xmax.setPlaceholderText("auto")
+        self.v_xmax.setMaximumWidth(60)
+        axes_layout.addWidget(self.v_xmax)
+        axes_layout.addWidget(QLabel("Y min"))
+        self.v_ymin = QLineEdit("")
+        self.v_ymin.setPlaceholderText("auto")
+        self.v_ymin.setMaximumWidth(60)
+        axes_layout.addWidget(self.v_ymin)
+        axes_layout.addWidget(QLabel("Y max"))
+        self.v_ymax = QLineEdit("")
+        self.v_ymax.setPlaceholderText("auto")
+        self.v_ymax.setMaximumWidth(60)
+        axes_layout.addWidget(self.v_ymax)
+        axes_layout.addWidget(QLabel("Tick font"))
+        self.v_tick_font = QComboBox()
+        self.v_tick_font.addItems(['Default','DejaVu Sans','Arial','Calibri','Times New Roman','Helvetica'])
+        self.v_tick_font.setMaximumWidth(100)
+        axes_layout.addWidget(self.v_tick_font)
+        self.v_grid_on = QCheckBox("Grid")
+        self.v_grid_on.setChecked(True)
+        axes_layout.addWidget(self.v_grid_on)
+        middle_layout.addWidget(axes_frame)
+
+        # Assemble controls panel
+        panel_widget = QWidget()
+        panel_layout = QVBoxLayout(panel_widget)
+        panel_layout.setContentsMargins(0,0,0,0)
+        panel_layout.setSpacing(5)
+        panel_layout.addWidget(top_panel)
+        panel_layout.addWidget(self.vec_var_controls_frame)
+        panel_layout.addWidget(middle_panel)
+
+        # Create matplotlib figure for vector plot in splitter (50/50 split)
         self.vector_figure = Figure(figsize=(12, 8))
         self.vector_canvas = FigureCanvas(self.vector_figure)
-        layout.addWidget(self.vector_canvas)
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(panel_widget)
+        splitter.addWidget(self.vector_canvas)
+        splitter.setSizes([400, 400])  # 50/50 split instead of 300/900
+        layout.addWidget(splitter)
         
         # Wire variable group
         self.vec_variable_group.buttonClicked.connect(self.update_vec_parameter_controls)
@@ -1637,25 +2159,47 @@ class FullStrokeOverviewGUI(QMainWindow):
         return flow_values
         
     def get_available_sweep_values(self):
-        """Get available sweep values (normalized), keeping other dims at common settings."""
+        """Get available sweep values with strict parameter control (flow=0.1, period=2.25, overlap=0.5)"""
         sweep_values = set()
+        
+        # Debug: Print all available parameter combinations
+        print("DEBUG: All available parameter combinations:")
+        for exp_key, exp_data in self.data['experiments'].items():
+            m = self._param_map(exp_data.get('parameters', {}))
+            print(f"  {exp_key}: flow={m['flow']}, sweep={m['sweep']}, period={m['stroke_period']}, overlap={m['overlap']}")
+        
+        # Only look for experiments with ideal settings: flow=0.1, period=2.25, overlap=0.5
         for exp_data in self.data['experiments'].values():
             m = self._param_map(exp_data.get('parameters', {}))
             if (abs(m['flow'] - 0.1) < 1e-6 and
                 abs(m['stroke_period'] - 2.25) < 1e-6 and
                 abs(m['overlap'] - 0.5) < 1e-6):
                 sweep_values.add(m['sweep'])
+        
+        print(f"DEBUG: Found {len(sweep_values)} sweep values with ideal settings: {sweep_values}")
+        
         return sweep_values
         
     def get_available_overlap_values(self):
-        """Get available overlap values (normalized), keeping other dims at common settings."""
+        """Get available overlap values with strict parameter control (flow=0.1, sweep=80, period=2.25)"""
         overlap_values = set()
+        
+        # Debug: Print all available parameter combinations
+        print("DEBUG: All available parameter combinations for overlap:")
+        for exp_key, exp_data in self.data['experiments'].items():
+            m = self._param_map(exp_data.get('parameters', {}))
+            print(f"  {exp_key}: flow={m['flow']}, sweep={m['sweep']}, period={m['stroke_period']}, overlap={m['overlap']}")
+        
+        # Only look for experiments with ideal settings: flow=0.1, sweep=80, period=2.25
         for exp_data in self.data['experiments'].values():
             m = self._param_map(exp_data.get('parameters', {}))
             if (abs(m['flow'] - 0.1) < 1e-6 and
                 abs(m['sweep'] - 80) < 1e-6 and
                 abs(m['stroke_period'] - 2.25) < 1e-6):
                 overlap_values.add(m['overlap'])
+        
+        print(f"DEBUG: Found {len(overlap_values)} overlap values with ideal settings: {overlap_values}")
+        
         return overlap_values
         
     def plot_mean_overview(self):
@@ -1755,28 +2299,38 @@ class FullStrokeOverviewGUI(QMainWindow):
         self.mean_canvas.draw()
         
     def get_experiments_for_parameter(self, variable_type, param_value):
-        """Get experiments matching the specified parameter value with normalized matching"""
+        """Get experiments matching the specified parameter value with strict parameter control"""
         matching_experiments = []
+        print(f"DEBUG: Looking for {variable_type}={param_value}")
+        
         for exp_key, exp_data in self.data['experiments'].items():
             m = self._param_map(exp_data.get('parameters', {}))
             if variable_type == "flow":
+                # For flow: fix sweep=80, period=2.25, overlap=0.5, vary flow
                 if (abs(m['sweep'] - 80) < 1e-6 and
                     abs(m['stroke_period'] - 2.25) < 1e-6 and
                     abs(m['overlap'] - 0.5) < 1e-6 and
                     abs(m['flow'] - float(param_value)) < 1e-6):
                     matching_experiments.append(exp_key)
+                    print(f"  Found flow match: {exp_key}")
             elif variable_type == "sweep":
+                # For sweep: fix flow=0.1, period=2.25, overlap=0.5, vary sweep
                 if (abs(m['flow'] - 0.1) < 1e-6 and
                     abs(m['stroke_period'] - 2.25) < 1e-6 and
                     abs(m['overlap'] - 0.5) < 1e-6 and
                     abs(m['sweep'] - float(param_value)) < 1e-6):
                     matching_experiments.append(exp_key)
-            else:
+                    print(f"  Found sweep match: {exp_key}")
+            else:  # overlap
+                # For overlap: fix flow=0.1, sweep=80, period=2.25, vary overlap
                 if (abs(m['flow'] - 0.1) < 1e-6 and
                     abs(m['sweep'] - 80) < 1e-6 and
                     abs(m['stroke_period'] - 2.25) < 1e-6 and
                     abs(m['overlap'] - float(param_value)) < 1e-6):
                     matching_experiments.append(exp_key)
+                    print(f"  Found overlap match: {exp_key}")
+        
+        print(f"DEBUG: Found {len(matching_experiments)} matching experiments: {matching_experiments}")
         return matching_experiments
         
     def export_mean_overview_png(self):
@@ -1953,13 +2507,24 @@ class FullStrokeOverviewGUI(QMainWindow):
                 mean_values.append(mean_force)
             
             if twist_values and mean_values:
-                ax.scatter(twist_values, mean_values, marker=marker, s=50, color='black',
+                # Color points by twist using the global twist color map (consistent across tabs)
+                colors = [self.twist_color_map.get(tw, (0.2, 0.2, 0.2, 1.0)) for tw in twist_values]
+                def _pf(s, d):
+                    try: return float(s)
+                    except: return d
+                size = _pf(self.mf_marker_size.text(), 50.0) if hasattr(self, 'mf_marker_size') else 50.0
+                ecolor = self.mf_marker_edge_color.text().strip() if hasattr(self, 'mf_marker_edge_color') else '#000000'
+                if ecolor and not ecolor.startswith('#'):
+                    ecolor = '#' + ecolor
+                ewidth = _pf(self.mf_marker_edge_width.text(), 0.4) if hasattr(self, 'mf_marker_edge_width') else 0.4
+                ax.scatter(twist_values, mean_values, marker=marker, s=size, c=colors,
+                           edgecolors=ecolor, linewidths=ewidth,
                            label=f"{variable_type.title()} {param_value}")
         
         ax.set_xlabel('Absolute Roll Angle (Twist) [degrees]')
         ax.set_ylabel(f'Mean {channel.title()} Force [N]')
         ax.set_title(f'Mean {channel.title()} vs Roll Angle')
-        ax.grid(True, alpha=0.3)
+        ax.grid(self.mf_grid_on.isChecked(), alpha=0.3)
         # Axis limits (if provided)
         def _to_float(s):
             try:
@@ -2000,6 +2565,23 @@ class FullStrokeOverviewGUI(QMainWindow):
         if self.mf_ylabel_on.isChecked():
             yl = self.mf_ylabel_text.text().strip() or f"Mean {channel.title()} Force (N)"
             ax.set_ylabel(yl)
+        # Tick steps and fonts
+        def _pf(s, default=None):
+            try:
+                return float(s)
+            except Exception:
+                return default
+        xstep = _pf(self.mf_xtick_step.text())
+        ystep = _pf(self.mf_ytick_step.text())
+        if xstep and xstep > 0:
+            xmin_cur, xmax_cur = ax.get_xlim()
+            ax.set_xticks(np.arange(xmin_cur, xmax_cur + 0.5 * xstep, xstep))
+        if ystep and ystep > 0:
+            ymin_cur, ymax_cur = ax.get_ylim()
+            ax.set_yticks(np.arange(ymin_cur, ymax_cur + 0.5 * ystep, ystep))
+        tick_fs = _pf(self.mf_tick_fs.text())
+        if tick_fs:
+            ax.tick_params(labelsize=tick_fs)
         # Legend
         if self.mf_legend_on.isChecked():
             ax.legend(loc=self.mf_legend_loc.currentText())
@@ -2008,8 +2590,11 @@ class FullStrokeOverviewGUI(QMainWindow):
 
     def update_mean_force_parameter_controls(self):
         """Populate per-value controls for Mean Force tab based on selected variable"""
+        print("DEBUG: update_mean_force_parameter_controls called")
+        
         # Guard for layout existence
         if not hasattr(self, 'mean_force_var_controls_layout') or self.mean_force_var_controls_layout is None:
+            print("DEBUG: Layout not found, returning")
             return
         # Clear existing child widgets safely
         try:
@@ -2023,21 +2608,27 @@ class FullStrokeOverviewGUI(QMainWindow):
         self.mean_force_parameter_controls = {}
         
         if not self.data or 'experiments' not in self.data:
+            print("DEBUG: No data available, returning")
             return
         
         # Determine variable and fixed label
         if self.mean_force_flow_radio.isChecked():
+            print("DEBUG: Flow radio button is checked")
             self.mean_force_fixed_params_label.setText("Flow: Variable | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
             values = self.get_available_flow_values()
             label_name = "flow"
         elif self.mean_force_sweep_radio.isChecked():
+            print("DEBUG: Sweep radio button is checked")
             self.mean_force_fixed_params_label.setText("Flow: 0.1 | Sweep: Variable | Period: 2.25s | Overlap: 0.5")
             values = self.get_available_sweep_values()
             label_name = "sweep"
         else:
+            print("DEBUG: Overlap radio button is checked")
             self.mean_force_fixed_params_label.setText("Flow: 0.1 | Sweep: 80° | Period: 2.25s | Overlap: Variable")
             values = self.get_available_overlap_values()
             label_name = "overlap"
+        
+        print(f"DEBUG: Found {len(values)} {label_name} values: {values}")
         
         markers = ["o", "s", "^", "v", "D", "p", "*", "h", "X", "+"]
         for i, value in enumerate(sorted(values)):
@@ -2088,6 +2679,19 @@ class FullStrokeOverviewGUI(QMainWindow):
             ctrl = self.peak_parameter_controls.get(val)
             return ctrl and ctrl['toggle'].isChecked()
 
+        # Smoothing helper to stabilize peak detection
+        def _smooth_signal(y: np.ndarray, window_size: int = 5) -> np.ndarray:
+            try:
+                w = int(max(3, min(window_size, (len(y)//10)*2+1)))
+            except Exception:
+                w = 5
+            if w % 2 == 0:
+                w += 1
+            if w <= 1 or w > len(y):
+                return y
+            kernel = np.ones(w, dtype=float) / float(w)
+            return np.convolve(y, kernel, mode='same')
+
         # Iterate parameter values selected
         for param_value, ctrl in list(self.peak_parameter_controls.items()):
             if not _enabled(param_value):
@@ -2109,47 +2713,83 @@ class FullStrokeOverviewGUI(QMainWindow):
                 if t_abs.size == 0 or ysig.size == 0:
                     continue
                 t_norm = self._normalize_time_vector(t_abs)
-                # Enforce rule of thumb: consider peaks only after 35% of cycle
-                min_phase = 0.35
+                # Consider peaks after 20% of cycle to capture early positive lift peaks
+                min_phase = 0.20
                 mask = (t_norm >= min_phase) & (t_norm <= 1.0)
                 if mask.sum() < 3:
                     continue
                 phase_seg = t_norm[mask]
                 y_seg = ysig[mask]
-                # detect local maxima and minima (both positive and negative peaks)
-                y1 = y_seg[1:-1]
-                prev = y_seg[:-2]
-                nxt = y_seg[2:]
+                # Light smoothing for stable extrema detection
+                y_sm = _smooth_signal(y_seg, window_size=5)
+                # Detect local maxima and minima
+                y1 = y_sm[1:-1]
+                prev = y_sm[:-2]
+                nxt = y_sm[2:]
                 max_idx = np.where((y1 > prev) & (y1 >= nxt))[0] + 1
                 min_idx = np.where((y1 < prev) & (y1 <= nxt))[0] + 1
-                cand_idx = np.concatenate([max_idx, min_idx])
-                if cand_idx.size == 0:
-                    # fallback: take global extremum by absolute value
-                    cand_idx = np.array([int(np.argmax(np.abs(y_seg)))])
-                # rank by absolute magnitude
-                order = np.argsort(-np.abs(y_seg[cand_idx]))
-                cand_idx = cand_idx[order]
-                # apply magnitude threshold ±0.5
-                thresh_mask = np.abs(y_seg[cand_idx]) >= 0.5
-                cand_idx = cand_idx[thresh_mask]
-                if cand_idx.size == 0:
+
+                # Dynamic threshold scaled to signal amplitude
+                amp = float(np.nanmax(np.abs(y_sm))) if y_sm.size > 0 else 0.0
+                thr = max(0.15, 0.12 * amp)
+
+                pts = []
+                if channel == 'lift':
+                    # Early positive peak: search in [0.20, 0.70]
+                    early = (phase_seg >= 0.20) & (phase_seg <= 0.70)
+                    pos_idx = [i for i in max_idx if early[i] and (y_sm[i] >= thr)]
+                    if len(pos_idx) > 0:
+                        i_pos = int(pos_idx[np.argmax([y_sm[i] for i in pos_idx])])
+                        pts.append((float(phase_seg[i_pos]), float(y_seg[i_pos])))
+                    # Later negative peak: search in [0.55, 1.00]
+                    late = (phase_seg >= 0.55) & (phase_seg <= 1.00)
+                    neg_idx = [i for i in min_idx if late[i] and (y_sm[i] <= -0.9*thr)]
+                    if len(neg_idx) > 0:
+                        i_neg = int(neg_idx[np.argmin([y_sm[i] for i in neg_idx])])
+                        pts.append((float(phase_seg[i_neg]), float(y_seg[i_neg])))
+                    else:
+                        # Fallback for broad troughs: pick global min in late window if sufficiently negative
+                        if np.any(late):
+                            candidates = np.where(late)[0]
+                            i_local = int(np.argmin(y_sm[candidates]))
+                            i_neg = int(candidates[i_local])
+                            if y_sm[i_neg] <= -0.5*thr:
+                                pts.append((float(phase_seg[i_neg]), float(y_seg[i_neg])))
+                else:
+                    # Thrust: fallback to two strongest extrema by |value|
+                    cand_idx = np.concatenate([max_idx, min_idx])
+                    if cand_idx.size == 0:
+                        cand_idx = np.array([int(np.argmax(np.abs(y_sm)))])
+                    order = np.argsort(-np.abs(y_sm[cand_idx]))
+                    cand_idx = cand_idx[order]
+                    keep = [i for i in cand_idx if np.abs(y_sm[i]) >= thr]
+                    for i in keep[:2]:
+                        pts.append((float(phase_seg[i]), float(y_seg[i])))
+
+                if len(pts) == 0:
                     continue
-                take = cand_idx[:2]
-                pts = [(float(phase_seg[i])*100.0, float(y_seg[i])) for i in take]
                 color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
-                # plot points
+                # plot points with marker style controls
+                def _pf(s, d):
+                    try: return float(s)
+                    except: return d
+                size = _pf(self.pk_marker_size.text(), 60.0) if hasattr(self, 'pk_marker_size') else 60.0
+                ecolor = self.pk_marker_edge_color.text().strip() if hasattr(self, 'pk_marker_edge_color') else '#000000'
+                if ecolor and not ecolor.startswith('#'):
+                    ecolor = '#' + ecolor
+                ewidth = _pf(self.pk_marker_edge_width.text(), 0.4) if hasattr(self, 'pk_marker_edge_width') else 0.4
                 for j, (px, py) in enumerate(pts):
                     lbl = f"{variable_type.title()} {param_value}" if not added_label and j == 0 else "_nolegend_"
-                    ax.scatter(px, py, marker=marker, s=60, c=[color], edgecolors='k', linewidths=0.4, label=lbl)
+                    ax.scatter(px, py, marker=marker, s=size, c=[color], edgecolors=ecolor, linewidths=ewidth, label=lbl)
                 # connect if two points
                 if len(pts) == 2:
                     ax.plot([pts[0][0], pts[1][0]], [pts[0][1], pts[1][1]], color=color, linewidth=1.0, alpha=0.7)
                 added_label = True
 
         # Axes formatting
-        ax.set_xlabel('Peak timing (% cycle)')
+        ax.set_xlabel('Peak timing (normalized 0–1)')
         ax.set_ylabel(f'Peak {channel.title()} (N)')
-        ax.grid(True, alpha=0.3)
+        ax.grid(self.pk_grid_on.isChecked(), alpha=0.3)
         # Apply user axes options
         def _f(s):
             try: return float(s)
@@ -2160,6 +2800,18 @@ class FullStrokeOverviewGUI(QMainWindow):
             xr = ax.get_xlim(); ax.set_xlim(xmin if xmin is not None else xr[0], xmax if xmax is not None else xr[1])
         if ymin is not None or ymax is not None:
             yr = ax.get_ylim(); ax.set_ylim(ymin if ymin is not None else yr[0], ymax if ymax is not None else yr[1])
+        # Default to normalized x-limits if none provided
+        if xmin is None and xmax is None:
+            ax.set_xlim(0.0, 1.0)
+        # Tick steps and fonts
+        xstep = _f(self.pk_xtick_step.text()); ystep = _f(self.pk_ytick_step.text())
+        if xstep and xstep > 0:
+            xmin_cur, xmax_cur = ax.get_xlim(); ax.set_xticks(np.arange(xmin_cur, xmax_cur + 0.5*xstep, xstep))
+        if ystep and ystep > 0:
+            ymin_cur, ymax_cur = ax.get_ylim(); ax.set_yticks(np.arange(ymin_cur, ymax_cur + 0.5*ystep, ystep))
+        ts = _f(self.pk_tick_fs.text())
+        if ts:
+            ax.tick_params(labelsize=ts)
         if self.pk_legend_on.isChecked():
             ax.legend(loc=self.pk_legend_loc.currentText())
         self.peak_location_canvas.draw()
@@ -2249,7 +2901,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         ax.set_xlabel('Mean Thrust Force (N)')
         ax.set_ylabel('Mean Lift Force (N)')
         ax.set_title('Force Vector Plot (Thrust vs Lift)')
-        ax.grid(True, alpha=0.3)
+        ax.grid(self.v_grid_on.isChecked(), alpha=0.3)
         # Axes limits controls (avoid invalid ranges)
         xmin = _f(self.v_xmin.text()); xmax = _f(self.v_xmax.text())
         ymin = _f(self.v_ymin.text()); ymax = _f(self.v_ymax.text())
