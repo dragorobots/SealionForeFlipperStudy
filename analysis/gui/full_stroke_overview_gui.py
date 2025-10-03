@@ -113,11 +113,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         super().__init__()
         self.data = None
         self.current_plot_data = None
-        self.window_start = 0.0  # Start of evaluation window (normalized phase)
-        self.window_end = 1.0    # End of evaluation window (normalized phase)
         self.trial_traces_file = None
-        self.window_finder_enabled = False
-        self.window_lines = []  # Will store the vertical line objects
         self.param_index = {            # unique values (normalized)
             'period': set(),
             'flow': set(),
@@ -295,6 +291,13 @@ class FullStrokeOverviewGUI(QMainWindow):
             c = base(i % 10)
             colors.append(c)
         return {tw: colors[idx] for idx, tw in enumerate(twists)}
+
+    def _normalize_time_vector(self, time_vector: np.ndarray) -> np.ndarray:
+        """Normalize absolute time to the combined stroke phase [0, 1] using [0.75s, 2.25s]."""
+        t = np.asarray(time_vector, dtype=float)
+        # Map 0.75->0 and 2.25->1
+        t_norm = (t - 0.75) / 1.5
+        return t_norm
             
     def _seed_defaults(self):
         """Seed default values for dataset selectors (from original GUI)"""
@@ -365,8 +368,8 @@ class FullStrokeOverviewGUI(QMainWindow):
             row['alpha'].setText('0.2')
             
             # Default legend label
-            default_lbl = f"flow={default_flow}, P={default_period}, sweep={row['yaw'].currentText()}, twist={default_roll}"
-            row['legend_label'].setText(default_lbl)
+            row['legend_auto'].setChecked(True)
+            self._update_row_auto_label(row)
             
     def populate_parameter_filters(self):
         """Populate the parameter filter dropdowns"""
@@ -404,90 +407,14 @@ class FullStrokeOverviewGUI(QMainWindow):
             
             
         
-    def toggle_window_finder(self, enabled):
-        """Toggle window finder (normalized phase) and manage controls safely"""
-        self.window_finder_enabled = enabled
-        for w in [getattr(self, 'window_start_slider', None), getattr(self, 'window_end_slider', None),
-                  getattr(self, 'choose_window_button', None), getattr(self, 'window_start_readout', None),
-                  getattr(self, 'window_end_readout', None)]:
-            if w:
-                w.setEnabled(enabled)
-        if enabled:
-            self.update_window_lines()
-            self.statusBar().showMessage("Window finder enabled")
-        else:
-            if getattr(self, 'window_lines', None):
-                for ln in self.window_lines:
-                    try:
-                        ln.remove()
-                    except:
-                        pass
-                self.window_lines = []
-            if hasattr(self, 'traces_canvas'):
-                self.traces_canvas.draw()
-            self.statusBar().showMessage("Window finder disabled")
-            
-    def update_window_start_from_slider(self, value):
-        """Update window start from slider (normalized phase)"""
-        self.window_start = value / 100.0
-        if hasattr(self, 'window_start_readout'):
-            self.window_start_readout.setText(f"{self.window_start:.2f}")
-        self.update_window_display()
-        if self.window_finder_enabled:
-            self.update_window_lines()
-            
-    def update_window_end_from_slider(self, value):
-        """Update window end from slider (normalized phase)"""
-        self.window_end = value / 100.0
-        if hasattr(self, 'window_end_readout'):
-            self.window_end_readout.setText(f"{self.window_end:.2f}")
-        self.update_window_display()
-        if self.window_finder_enabled:
-            self.update_window_lines()
-            
-    def update_window_display(self):
-        """Update the window display label"""
-        if hasattr(self, 'window_display'):
-            self.window_display.setText(f"{self.window_start:.2f}-{self.window_end:.2f}")
-        
-    def choose_window(self):
-        """Apply the selected normalized-phase window"""
-        if self.window_start >= self.window_end:
-            QMessageBox.warning(self, "Invalid Window", "Window start must be less than window end")
-            return
-        self.statusBar().showMessage(f"Window set: {self.window_start:.2f} - {self.window_end:.2f}")
-        
-    def update_window_lines(self):
-        """Draw vertical lines at window bounds using normalized phase -> time mapping"""
-        if not (self.window_finder_enabled and hasattr(self, 'ax') and self.data and self.data.get('time_vector') is not None):
-            return
-        # Clear existing
-        if getattr(self, 'window_lines', None):
-            for ln in self.window_lines:
-                try:
-                    ln.remove()
-                except:
-                    pass
-        self.window_lines = []
-        
-        t = self.data['time_vector']
-        phase = (t - t.min()) / (t.max() - t.min())
-        t0 = np.interp(self.window_start, phase, t)
-        t1 = np.interp(self.window_end,   phase, t)
-        
-        ax = self.ax
-        self.window_lines = [
-            ax.axvline(t0, color='red', linestyle='--', linewidth=2, alpha=0.8),
-            ax.axvline(t1, color='red', linestyle='--', linewidth=2, alpha=0.8)
-        ]
-        if hasattr(self, 'traces_canvas'):
-            self.traces_canvas.draw()
+    # Window finder removed – timeline is fixed to normalized [0,1]
         
     def _build_selector_row(self, parent_layout, idx):
         """Build a dataset selector row (from original GUI)"""
         row_widget = QWidget()
         row_layout = QHBoxLayout(row_widget)
-        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setContentsMargins(4, 2, 4, 2)
+        row_layout.setSpacing(12)
         
         # Include checkbox
         include_var = QCheckBox(f"Include {idx+1}")
@@ -497,30 +424,35 @@ class FullStrokeOverviewGUI(QMainWindow):
         # Flow selector
         row_layout.addWidget(QLabel("Flow"))
         flow_var = QComboBox()
+        flow_var.setMinimumWidth(80)
         # Will be populated after data loading
         row_layout.addWidget(flow_var)
         
         # Period selector
         row_layout.addWidget(QLabel("Period"))
         period_var = QComboBox()
+        period_var.setMinimumWidth(80)
         # Will be populated after data loading
         row_layout.addWidget(period_var)
         
         # Sweep selector
         row_layout.addWidget(QLabel("Sweep"))
         yaw_var = QComboBox()
+        yaw_var.setMinimumWidth(80)
         # Will be populated after data loading
         row_layout.addWidget(yaw_var)
         
         # Twist selector
         row_layout.addWidget(QLabel("Twist"))
         roll_var = QComboBox()
+        roll_var.setMinimumWidth(80)
         # Will be populated after data loading
         row_layout.addWidget(roll_var)
         
         # Overlap selector
         row_layout.addWidget(QLabel("Overlap"))
         pt_var = QComboBox()
+        pt_var.setMinimumWidth(80)
         # Will be populated after data loading
         row_layout.addWidget(pt_var)
         
@@ -529,6 +461,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         color_var = QLineEdit()
         default_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
         color_var.setText(default_colors[idx % len(default_colors)])
+        color_var.setMaximumWidth(90)
         row_layout.addWidget(color_var)
         
         # Line width
@@ -552,6 +485,11 @@ class FullStrokeOverviewGUI(QMainWindow):
         legend_on_var.setChecked(True)
         row_layout.addWidget(legend_on_var)
         
+        # Legend auto checkbox
+        legend_auto_var = QCheckBox("Auto")
+        legend_auto_var.setChecked(True)
+        row_layout.addWidget(legend_auto_var)
+
         # Legend label
         legend_label_var = QLineEdit()
         legend_label_var.setMaximumWidth(150)
@@ -559,7 +497,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         
         parent_layout.addWidget(row_widget)
         
-        return {
+        row = {
             'include': include_var,
             'flow': flow_var,
             'period': period_var,
@@ -571,8 +509,64 @@ class FullStrokeOverviewGUI(QMainWindow):
             'variance': var_var,
             'alpha': alpha_var,
             'legend_on': legend_on_var,
+            'legend_auto': legend_auto_var,
             'legend_label': legend_label_var,
         }
+        # Wire changes to keep auto legend up to date
+        self._wire_row_signals(row)
+        return row
+
+    def _compute_row_auto_label(self, row) -> str:
+        try:
+            flow = row['flow'].currentText().strip()
+        except Exception:
+            flow = ''
+        try:
+            period = row['period'].currentText().strip()
+        except Exception:
+            period = ''
+        try:
+            yaw = row['yaw'].currentText().strip()
+        except Exception:
+            yaw = ''
+        try:
+            roll = row['roll'].currentText().strip()
+        except Exception:
+            roll = ''
+        try:
+            pt = row['pt'].currentText().strip()
+        except Exception:
+            pt = ''
+        parts = [
+            f"flow={flow}" if flow != '' else None,
+            f"P={period}" if period != '' else None,
+            f"sweep={yaw}" if yaw != '' else None,
+            f"twist={roll}" if roll != '' else None,
+            f"overlap={pt}" if pt != '' else None,
+        ]
+        return ", ".join([p for p in parts if p])
+
+    def _update_row_auto_label(self, row):
+        try:
+            if row['legend_auto'].isChecked():
+                row['legend_label'].setText(self._compute_row_auto_label(row))
+                row['legend_label'].setEnabled(False)
+            else:
+                row['legend_label'].setEnabled(True)
+        except Exception:
+            pass
+
+    def _wire_row_signals(self, row):
+        # When any selector changes and auto is on, update label
+        for key in ['flow', 'period', 'yaw', 'roll', 'pt']:
+            try:
+                row[key].currentIndexChanged.connect(lambda _=None, r=row: self._update_row_auto_label(r))
+            except Exception:
+                pass
+        try:
+            row['legend_auto'].toggled.connect(lambda _=None, r=row: self._update_row_auto_label(r))
+        except Exception:
+            pass
         
         
     def create_tabbed_plot_panel(self, parent):
@@ -615,8 +609,8 @@ class FullStrokeOverviewGUI(QMainWindow):
         axis_layout = QGridLayout(axis_frame)
         
         self.xmin_var = QLineEdit("0.0")
-        self.xmax_var = QLineEdit("3.0")
-        self.xstep_var = QLineEdit("0.5")
+        self.xmax_var = QLineEdit("1.0")
+        self.xstep_var = QLineEdit("0.1")
         self.ymin_var = QLineEdit("-5.0")
         self.ymax_var = QLineEdit("5.0")
         self.ystep_var = QLineEdit("1.0")
@@ -660,7 +654,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         # X label controls
         self.xlabel_on_var = QCheckBox("X Label")
         self.xlabel_on_var.setChecked(True)
-        self.xlabel_text_var = QLineEdit("Time (s)")
+        self.xlabel_text_var = QLineEdit("Normalized Time (0–1)")
         self.xlabel_font_var = QComboBox()
         self.xlabel_font_var.addItems(font_choices)
         self.xlabel_font_var.setCurrentText('Default')
@@ -753,59 +747,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         
         traces_layout.addWidget(ctrl_frame)
         
-        # Window finder section (compact version for Trial Traces tab)
-        window_frame = QFrame()
-        window_layout = QHBoxLayout(window_frame)
-        window_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Window finder toggle
-        self.window_finder_checkbox = QCheckBox("Window Finder")
-        self.window_finder_checkbox.toggled.connect(self.toggle_window_finder)
-        window_layout.addWidget(self.window_finder_checkbox)
-        
-        # Window sliders (longer with readouts)
-        window_layout.addWidget(QLabel("Start:"))
-        self.window_start_slider = QSlider(Qt.Horizontal)
-        self.window_start_slider.setRange(0, 100)
-        self.window_start_slider.setValue(0)
-        self.window_start_slider.setMaximumWidth(200)  # Made twice as long
-        self.window_start_slider.valueChanged.connect(self.update_window_start_from_slider)
-        window_layout.addWidget(self.window_start_slider)
-        
-        # Start value readout
-        self.window_start_readout = QLabel("0.00")
-        self.window_start_readout.setMaximumWidth(40)
-        self.window_start_readout.setAlignment(Qt.AlignCenter)
-        window_layout.addWidget(self.window_start_readout)
-        
-        window_layout.addWidget(QLabel("End:"))
-        self.window_end_slider = QSlider(Qt.Horizontal)
-        self.window_end_slider.setRange(0, 100)
-        self.window_end_slider.setValue(100)
-        self.window_end_slider.setMaximumWidth(200)  # Made twice as long
-        self.window_end_slider.valueChanged.connect(self.update_window_end_from_slider)
-        window_layout.addWidget(self.window_end_slider)
-        
-        # End value readout
-        self.window_end_readout = QLabel("1.00")
-        self.window_end_readout.setMaximumWidth(40)
-        self.window_end_readout.setAlignment(Qt.AlignCenter)
-        window_layout.addWidget(self.window_end_readout)
-        
-        # Choose window button (compact)
-        self.choose_window_button = QPushButton("Set Window")
-        self.choose_window_button.clicked.connect(self.choose_window)
-        self.choose_window_button.setEnabled(False)
-        self.choose_window_button.setMaximumWidth(80)
-        window_layout.addWidget(self.choose_window_button)
-        
-        # Current window display (compact)
-        self.window_display = QLabel("0.00-1.00")
-        self.window_display.setMaximumWidth(80)
-        window_layout.addWidget(self.window_display)
-        
-        window_layout.addStretch()
-        traces_layout.addWidget(window_frame)
+        # Window finder removed – x-axis is fixed normalized [0,1]
         
         # Dataset selectors (up to 10) - EXACT copy
         sel_frame = QGroupBox("Datasets (up to 10)")
@@ -838,85 +780,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         self.tab_widget.addTab(traces_widget, "Trial Traces")
         
         
-    def toggle_window_finder(self, enabled):
-        """Toggle window finder functionality"""
-        self.window_finder_enabled = enabled
-        self.window_start_slider.setEnabled(enabled)
-        self.window_end_slider.setEnabled(enabled)
-        self.choose_window_button.setEnabled(enabled)
-        if hasattr(self, 'window_start_readout'):
-            self.window_start_readout.setEnabled(enabled)
-        if hasattr(self, 'window_end_readout'):
-            self.window_end_readout.setEnabled(enabled)
-        
-        if enabled:
-            self.update_window_lines()
-        else:
-            # Remove window lines if they exist
-            if hasattr(self, 'window_lines') and self.window_lines:
-                for line in self.window_lines:
-                    try:
-                        line.remove()
-                    except:
-                        pass  # Line might already be removed
-                self.traces_canvas.draw()
-                
-    def update_window_start_from_slider(self, value):
-        """Update window start from slider"""
-        self.window_start = value / 100.0
-        if hasattr(self, 'window_start_readout'):
-            self.window_start_readout.setText(f"{self.window_start:.2f}")
-        self.update_window_display()
-        if self.window_finder_enabled:
-            self.update_window_lines()
-            
-    def update_window_end_from_slider(self, value):
-        """Update window end from slider"""
-        self.window_end = value / 100.0
-        if hasattr(self, 'window_end_readout'):
-            self.window_end_readout.setText(f"{self.window_end:.2f}")
-        self.update_window_display()
-        if self.window_finder_enabled:
-            self.update_window_lines()
-            
-    def update_window_display(self):
-        """Update the window display label"""
-        self.window_display.setText(f"{self.window_start:.2f}-{self.window_end:.2f}")
-        
-    def choose_window(self):
-        """Set the chosen window for overview metrics"""
-        if self.window_start >= self.window_end:
-            QMessageBox.warning(self, "Invalid Window", "Window start must be less than window end")
-            return
-            
-        self.statusBar().showMessage(f"Window set: {self.window_start:.2f} - {self.window_end:.2f}")
-        
-    def update_window_lines(self):
-        """Update the vertical lines on the plot"""
-        if not self.window_finder_enabled or not hasattr(self, 'ax'):
-            return
-            
-        # Remove existing window lines
-        if hasattr(self, 'window_lines') and self.window_lines:
-            for line in self.window_lines:
-                try:
-                    line.remove()
-                except:
-                    pass  # Line might already be removed
-        
-        # Get current axis limits
-        xlim = self.ax.get_xlim()
-        if xlim[1] > xlim[0]:
-            # Calculate actual time positions
-            start_time = xlim[0] + self.window_start * (xlim[1] - xlim[0])
-            end_time = xlim[0] + self.window_end * (xlim[1] - xlim[0])
-            
-            # Draw vertical lines
-            line1 = self.ax.axvline(start_time, color='red', linestyle='--', linewidth=2, alpha=0.8)
-            line2 = self.ax.axvline(end_time, color='red', linestyle='--', linewidth=2, alpha=0.8)
-            
-            self.window_lines = [line1, line2]
-            self.traces_canvas.draw()
+    
         
     def plot_overlay(self):
         """Plot overlay traces (EXACT copy from original GUI)"""
@@ -979,14 +843,22 @@ class FullStrokeOverviewGUI(QMainWindow):
                     continue
                     
                 exp_data = self.data['experiments'][exp_key]
-                t = exp_data['time_vector']
+                # Normalize absolute time to [0,1] based on [0.75, 2.25]
+                t_abs = np.asarray(exp_data['time_vector'])
+                t = self._normalize_time_vector(t_abs)
+                # Clip to [0,1] domain
+                mask_domain = (t >= 0.0) & (t <= 1.0)
+                if not np.any(mask_domain):
+                    continue
                 if self.channel_var.currentText() == 'thrust':
-                    y = exp_data['thrust_mean']
-                    ystd = exp_data.get('thrust_std', None)
+                    y = np.asarray(exp_data['thrust_mean'])[mask_domain]
+                    ystd_full = exp_data.get('thrust_std', None)
+                    ystd = np.asarray(ystd_full)[mask_domain] if ystd_full is not None else None
                     label = f"T: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}"
                 else:
-                    y = exp_data['lift_mean']
-                    ystd = exp_data.get('lift_std', None)
+                    y = np.asarray(exp_data['lift_mean'])[mask_domain]
+                    ystd_full = exp_data.get('lift_std', None)
+                    ystd = np.asarray(ystd_full)[mask_domain] if ystd_full is not None else None
                     label = f"L: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}"
 
                 # Styles
@@ -1054,7 +926,7 @@ class FullStrokeOverviewGUI(QMainWindow):
 
                 # Mean line with legend label control
                 plot_label = legend_label if legend_on and legend_label else '_nolegend_'
-                self.ax.plot(t, y, linewidth=max(0.5, lw), label=plot_label, color=color)
+                self.ax.plot(t[mask_domain], y, linewidth=max(0.5, lw), label=plot_label, color=color)
 
             if selections and self.legend_on_var.isChecked():
                 loc = self.legend_loc_var.currentText() if self.legend_loc_var.currentText() else 'best'
@@ -1067,11 +939,11 @@ class FullStrokeOverviewGUI(QMainWindow):
                 except Exception:
                     return default
 
-            xmin = _parse_float(self.xmin_var.text(), 0.0)
-            xmax = _parse_float(self.xmax_var.text(), 3.0)
+            xmin = 0.0
+            xmax = 1.0
             ymin = _parse_float(self.ymin_var.text(), -5.0)
             ymax = _parse_float(self.ymax_var.text(), 5.0)
-            xstep = _parse_float(self.xstep_var.text(), 0.5)
+            xstep = _parse_float(self.xstep_var.text(), 0.1)
             ystep = _parse_float(self.ystep_var.text(), 1.0)
 
             if xmax > xmin:
@@ -1087,9 +959,7 @@ class FullStrokeOverviewGUI(QMainWindow):
 
             self.traces_canvas.draw()
             
-            # Update window lines if window finder is enabled
-            if self.window_finder_enabled:
-                self.update_window_lines()
+            # No window lines; x-axis is normalized 0..1
 
         except Exception as e:
             QMessageBox.critical(self, "Plot Error", f"Failed to plot: {e}")
@@ -1119,11 +989,44 @@ class FullStrokeOverviewGUI(QMainWindow):
             name = self.pub_name_var.text()
             
             # Save figure
-            self.traces_figure.savefig(name, dpi=100, bbox_inches='tight', 
-                                     facecolor='white', edgecolor='none')
+            self.traces_figure.set_size_inches(wpx/100.0, hpx/100.0)
+            self.traces_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
             
             QMessageBox.information(self, "Success", f"Figure saved as {name}")
             
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
+
+    def publish_mean_force_figure(self):
+        try:
+            wpx = int(float(self.mf_pub_w.text()))
+            hpx = int(float(self.mf_pub_h.text()))
+            name = self.mf_pub_name.text()
+            self.mean_force_figure.set_size_inches(wpx/100.0, hpx/100.0)
+            self.mean_force_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            QMessageBox.information(self, "Success", f"Figure saved as {name}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
+
+    def publish_peak_location_figure(self):
+        try:
+            wpx = int(float(self.pk_pub_w.text()))
+            hpx = int(float(self.pk_pub_h.text()))
+            name = self.pk_pub_name.text()
+            self.peak_location_figure.set_size_inches(wpx/100.0, hpx/100.0)
+            self.peak_location_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            QMessageBox.information(self, "Success", f"Figure saved as {name}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
+
+    def publish_vector_figure(self):
+        try:
+            wpx = int(float(self.vec_pub_w.text()))
+            hpx = int(float(self.vec_pub_h.text()))
+            name = self.vec_pub_name.text()
+            self.vector_figure.set_size_inches(wpx/100.0, hpx/100.0)
+            self.vector_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            QMessageBox.information(self, "Success", f"Figure saved as {name}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
         
@@ -1187,6 +1090,23 @@ class FullStrokeOverviewGUI(QMainWindow):
         
         control_layout.addStretch()
         layout.addWidget(control_frame)
+
+        # Publish controls
+        pub_frame = QGroupBox("Publish")
+        pub_layout = QGridLayout(pub_frame)
+        self.mf_pub_w = QLineEdit("1200")
+        self.mf_pub_h = QLineEdit("800")
+        self.mf_pub_name = QLineEdit("MeanForce_plot.png")
+        pub_layout.addWidget(QLabel("W(px)"), 0, 0)
+        pub_layout.addWidget(self.mf_pub_w, 0, 1)
+        pub_layout.addWidget(QLabel("H(px)"), 0, 2)
+        pub_layout.addWidget(self.mf_pub_h, 0, 3)
+        pub_layout.addWidget(QLabel("Name"), 1, 0)
+        pub_layout.addWidget(self.mf_pub_name, 1, 1, 1, 3)
+        mf_pub_button = QPushButton("Publish PNG")
+        mf_pub_button.clicked.connect(self.publish_mean_force_figure)
+        pub_layout.addWidget(mf_pub_button, 0, 4, 2, 1)
+        layout.addWidget(pub_frame)
 
         # Axes & Legend Controls (similar to Traces tab)
         axes_frame = QGroupBox("Axes and Legend")
@@ -1291,6 +1211,23 @@ class FullStrokeOverviewGUI(QMainWindow):
         control_layout.addWidget(self.plot_peak_location_button)
         control_layout.addStretch()
         layout.addWidget(control_frame)
+
+        # Publish controls
+        pub_frame = QGroupBox("Publish")
+        pub_layout = QGridLayout(pub_frame)
+        self.pk_pub_w = QLineEdit("1200")
+        self.pk_pub_h = QLineEdit("800")
+        self.pk_pub_name = QLineEdit("PeakLocation_plot.png")
+        pub_layout.addWidget(QLabel("W(px)"), 0, 0)
+        pub_layout.addWidget(self.pk_pub_w, 0, 1)
+        pub_layout.addWidget(QLabel("H(px)"), 0, 2)
+        pub_layout.addWidget(self.pk_pub_h, 0, 3)
+        pub_layout.addWidget(QLabel("Name"), 1, 0)
+        pub_layout.addWidget(self.pk_pub_name, 1, 1, 1, 3)
+        pk_pub_button = QPushButton("Publish PNG")
+        pk_pub_button.clicked.connect(self.publish_peak_location_figure)
+        pub_layout.addWidget(pk_pub_button, 0, 4, 2, 1)
+        layout.addWidget(pub_frame)
 
         # Axes and legend controls (compact)
         axes_frame = QGroupBox("Axes and Legend")
@@ -1444,6 +1381,23 @@ class FullStrokeOverviewGUI(QMainWindow):
         self.v_ymax.setPlaceholderText("auto")
         control_layout.addWidget(self.v_ymax, 1, 8)
         layout.addWidget(control_frame)
+
+        # Publish controls
+        pub_frame = QGroupBox("Publish")
+        pub_layout = QGridLayout(pub_frame)
+        self.vec_pub_w = QLineEdit("1200")
+        self.vec_pub_h = QLineEdit("800")
+        self.vec_pub_name = QLineEdit("Vector_plot.png")
+        pub_layout.addWidget(QLabel("W(px)"), 0, 0)
+        pub_layout.addWidget(self.vec_pub_w, 0, 1)
+        pub_layout.addWidget(QLabel("H(px)"), 0, 2)
+        pub_layout.addWidget(self.vec_pub_h, 0, 3)
+        pub_layout.addWidget(QLabel("Name"), 1, 0)
+        pub_layout.addWidget(self.vec_pub_name, 1, 1, 1, 3)
+        vec_pub_button = QPushButton("Publish PNG")
+        vec_pub_button.clicked.connect(self.publish_vector_figure)
+        pub_layout.addWidget(vec_pub_button, 0, 4, 2, 1)
+        layout.addWidget(pub_frame)
         
         # Create matplotlib figure for vector plot
         self.vector_figure = Figure(figsize=(12, 8))
@@ -1739,7 +1693,7 @@ class FullStrokeOverviewGUI(QMainWindow):
             if not experiments:
                 continue
                 
-            # Calculate windowed means for each experiment
+            # Calculate windowed means for each experiment (fixed normalization [0.75,2.25]→[0,1])
             twist_values = []
             mean_values = []
             
@@ -1760,24 +1714,14 @@ class FullStrokeOverviewGUI(QMainWindow):
                 if len(time_vector) == 0 or len(force_data) == 0:
                     continue
                 
-                # Calculate windowed mean using trapezoidal integration
-                t0 = self.window_start
-                t1 = self.window_end
-                
-                # Find indices for window
-                time_array = np.array(time_vector)
-                idx_start = np.argmin(np.abs(time_array - t0))
-                idx_end = np.argmin(np.abs(time_array - t1))
-                
-                if idx_end <= idx_start:
+                # Fixed normalization and mask
+                time_array = np.asarray(time_vector)
+                t_norm = self._normalize_time_vector(time_array)
+                mask = (t_norm >= 0.0) & (t_norm <= 1.0)
+                if not np.any(mask):
                     continue
-                
-                # Extract windowed data
-                window_time = time_array[idx_start:idx_end+1]
-                window_force = np.array(force_data)[idx_start:idx_end+1]
-                
-                # Compute arithmetic mean over phase window
-                mean_force = float(np.mean(window_force)) if len(window_force) > 0 else np.nan
+                window_force = np.asarray(force_data)[mask]
+                mean_force = float(np.mean(window_force)) if window_force.size > 0 else np.nan
                 
                 twist_values.append(twist)
                 mean_values.append(mean_force)
@@ -1887,15 +1831,11 @@ class FullStrokeOverviewGUI(QMainWindow):
                 time_vector = exp_data.get('time_vector', [])
                 
                 if len(trace) > 0 and len(time_vector) > 0:
-                    # Apply window if set
-                    if hasattr(self, 'window_start') and hasattr(self, 'window_end'):
-                        start_idx = int(self.window_start * len(trace))
-                        end_idx = int(self.window_end * len(trace))
-                        windowed_trace = trace[start_idx:end_idx]
-                        windowed_time = time_vector[start_idx:end_idx]
-                    else:
-                        windowed_trace = trace
-                        windowed_time = time_vector
+                    # Apply fixed normalization domain 0..1
+                    t_norm = self._normalize_time_vector(np.asarray(time_vector))
+                    mask = (t_norm >= 0.0) & (t_norm <= 1.0)
+                    windowed_trace = np.asarray(trace)[mask]
+                    windowed_time = t_norm[mask]
                     
                     # Compute arithmetic mean over the phase window
                     mean_force = float(np.mean(windowed_trace)) if len(windowed_trace) > 0 else np.nan
@@ -2000,10 +1940,10 @@ class FullStrokeOverviewGUI(QMainWindow):
                     continue
                 
                 # Normalize phase 0..1 and compute arithmetic mean within phase window
-                time_array = np.array(time_vector)
-                force_array = np.array(force_data)
-                phase = (time_array - time_array.min()) / (time_array.max() - time_array.min())
-                mask = (phase >= self.window_start) & (phase <= self.window_end)
+                time_array = np.asarray(time_vector)
+                force_array = np.asarray(force_data)
+                t_norm = self._normalize_time_vector(time_array)
+                mask = (t_norm >= 0.0) & (t_norm <= 1.0)
                 if not np.any(mask):
                     continue
                 window_force = force_array[mask]
@@ -2161,22 +2101,20 @@ class FullStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
-                t = np.asarray(exp.get('time_vector', []))
+                t_abs = np.asarray(exp.get('time_vector', []))
                 if channel == 'thrust':
                     ysig = np.asarray(exp.get('thrust_mean', []))
                 else:
                     ysig = np.asarray(exp.get('lift_mean', []))
-                if t.size == 0 or ysig.size == 0:
+                if t_abs.size == 0 or ysig.size == 0:
                     continue
-                phase = (t - t.min())/(t.max()-t.min())
+                t_norm = self._normalize_time_vector(t_abs)
                 # Enforce rule of thumb: consider peaks only after 35% of cycle
-                min_phase = max(self.window_start, 0.35)
-                if self.window_end <= min_phase:
-                    continue
-                mask = (phase >= min_phase) & (phase <= self.window_end)
+                min_phase = 0.35
+                mask = (t_norm >= min_phase) & (t_norm <= 1.0)
                 if mask.sum() < 3:
                     continue
-                phase_seg = phase[mask]
+                phase_seg = t_norm[mask]
                 y_seg = ysig[mask]
                 # detect local maxima and minima (both positive and negative peaks)
                 y1 = y_seg[1:-1]
@@ -2280,13 +2218,13 @@ class FullStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
-                t = np.asarray(exp.get('time_vector', []))
+                t_abs = np.asarray(exp.get('time_vector', []))
                 thrust = np.asarray(exp.get('thrust_mean', []))
                 lift = np.asarray(exp.get('lift_mean', []))
-                if t.size == 0 or thrust.size == 0 or lift.size == 0:
+                if t_abs.size == 0 or thrust.size == 0 or lift.size == 0:
                     continue
-                phase = (t - t.min())/(t.max()-t.min())
-                mask = (phase >= self.window_start) & (phase <= self.window_end)
+                t_norm = self._normalize_time_vector(t_abs)
+                mask = (t_norm >= 0.0) & (t_norm <= 1.0)
                 if not np.any(mask):
                     continue
                 mt = float(np.mean(thrust[mask]))
@@ -2366,46 +2304,7 @@ class FullStrokeOverviewGUI(QMainWindow):
                 
         return selected_experiments
         
-    def update_window_start(self):
-        """Update window start value"""
-        try:
-            self.window_start = float(self.window_start_input.text())
-            if self.window_start < 0.0:
-                self.window_start = 0.0
-                self.window_start_input.setText("0.0")
-            elif self.window_start > 1.0:
-                self.window_start = 1.0
-                self.window_start_input.setText("1.0")
-            elif self.window_start >= self.window_end:
-                self.window_start = self.window_end - 0.01
-                self.window_start_input.setText(f"{self.window_start:.2f}")
-        except ValueError:
-            self.window_start_input.setText(f"{self.window_start:.2f}")
-            
-    def update_window_end(self):
-        """Update window end value"""
-        try:
-            self.window_end = float(self.window_end_input.text())
-            if self.window_end > 1.0:
-                self.window_end = 1.0
-                self.window_end_input.setText("1.0")
-            elif self.window_end < 0.0:
-                self.window_end = 0.0
-                self.window_end_input.setText("0.0")
-            elif self.window_end <= self.window_start:
-                self.window_end = self.window_start + 0.01
-                self.window_end_input.setText(f"{self.window_end:.2f}")
-        except ValueError:
-            self.window_end_input.setText(f"{self.window_end:.2f}")
-            
-    def update_window_from_slider(self, value):
-        """Update window from slider value"""
-        window_size = value / 100.0
-        center = (self.window_start + self.window_end) / 2.0
-        self.window_start = max(0.0, center - window_size / 2.0)
-        self.window_end = min(1.0, center + window_size / 2.0)
-        self.window_start_input.setText(f"{self.window_start:.2f}")
-        self.window_end_input.setText(f"{self.window_end:.2f}")
+    # Window controls removed – domain is fixed to 0..1
         
     def create_menu_bar(self):
         """Create the menu bar"""
@@ -2446,7 +2345,7 @@ class FullStrokeOverviewGUI(QMainWindow):
                     info_text += f"  {key}: {len(set(values))} unique values\n"
             
             info_text += f"\nTime Vector Length: {len(self.data['time_vector'])}\n"
-            info_text += f"Evaluation Window: {self.window_start:.2f} - {self.window_end:.2f}\n"
+            info_text += "Evaluation Window: 0.00 - 1.00 (fixed normalization)\n"
         
         # Data info display removed - functionality moved to individual tabs
         
@@ -2487,14 +2386,19 @@ class FullStrokeOverviewGUI(QMainWindow):
                     continue
                     
                 exp_data = self.data['experiments'][exp_key]
-                time_vector = exp_data['time_vector']
+                # Normalize and clip time to [0,1]
+                t_abs = np.asarray(exp_data['time_vector'])
+                t = self._normalize_time_vector(t_abs)
+                mask_domain = (t >= 0.0) & (t <= 1.0)
+                if not np.any(mask_domain):
+                    continue
                 
                 # Get channel data
                 channel = self.channel_var.currentText()
                 if channel == 'thrust':
-                    trace_data = exp_data['thrust_mean']
+                    trace_data = np.asarray(exp_data['thrust_mean'])[mask_domain]
                 else:  # lift
-                    trace_data = exp_data['lift_mean']
+                    trace_data = np.asarray(exp_data['lift_mean'])[mask_domain]
                 
                 # Get styling
                 color = row['color'].text()
@@ -2509,7 +2413,7 @@ class FullStrokeOverviewGUI(QMainWindow):
                 
                 # Plot the trace
                 label = row['legend_label'].text() if row['legend_on'].isChecked() else None
-                ax.plot(time_vector, trace_data, color=color, linewidth=lw, 
+                ax.plot(t[mask_domain], trace_data, color=color, linewidth=lw, 
                        alpha=alpha, label=label)
                 
                 # Add variance shading if requested
@@ -2522,17 +2426,19 @@ class FullStrokeOverviewGUI(QMainWindow):
                         std_data = None
                         
                     if std_data is not None:
-                        ax.fill_between(time_vector, trace_data - std_data, 
+                        std_data = np.asarray(std_data)[mask_domain]
+                        ax.fill_between(t[mask_domain], trace_data - std_data, 
                                       trace_data + std_data, color=color, alpha=0.1)
             
             # Set axis properties
+            # Force normalized x-limits
             try:
-                ax.set_xlim(float(self.xmin_var.text()), float(self.xmax_var.text()))
+                ax.set_xlim(0.0, 1.0)
                 ax.set_ylim(float(self.ymin_var.text()), float(self.ymax_var.text()))
             except ValueError:
-                pass  # Use default limits
+                pass
                 
-            ax.set_xlabel('Time (s)')
+            ax.set_xlabel('Normalized Time (0–1)')
             ax.set_ylabel('Force (scaled)')
             ax.set_title('Mean Trial Traces')
             ax.grid(True, alpha=0.3)
@@ -2545,9 +2451,7 @@ class FullStrokeOverviewGUI(QMainWindow):
             self.traces_figure.tight_layout()
             self.traces_canvas.draw()
             
-            # Update window lines if window finder is enabled
-            if self.window_finder_enabled:
-                self.update_window_lines()
+            # No window lines
                 
             self.statusBar().showMessage(f"Plotted {len(selections)} experiments")
             
@@ -2787,11 +2691,11 @@ class FullStrokeOverviewGUI(QMainWindow):
             lift_trace = exp_data['lift_mean']
             time_vector = exp_data['time_vector']
             
-            # Normalize time vector to 0-1 phase
-            time_norm = (time_vector - time_vector.min()) / (time_vector.max() - time_vector.min())
+            # Normalize absolute time to fixed 0-1 combined stroke phase
+            time_norm = self._normalize_time_vector(time_vector)
             
-            # Apply evaluation window
-            window_mask = (time_norm >= self.window_start) & (time_norm <= self.window_end)
+            # Apply fixed domain
+            window_mask = (time_norm >= 0.0) & (time_norm <= 1.0)
             thrust_windowed = thrust_trace[window_mask]
             lift_windowed = lift_trace[window_mask]
             time_windowed = time_norm[window_mask]
