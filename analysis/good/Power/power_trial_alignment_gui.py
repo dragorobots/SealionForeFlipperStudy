@@ -291,6 +291,12 @@ class PowerTrialAlignmentGUI:
                 for key in settings_group.keys():
                     self.settings[key] = settings_group[key][:]
                 
+                # Load per-experiment parameters if present (period, yaw, roll, flow_speed)
+                if 'experiment_parameters' in f:
+                    self.experiment_parameters = f['experiment_parameters'][:]
+                else:
+                    self.experiment_parameters = None
+
                 # Load parameter combinations
                 param_group = f['parameter_combinations']
                 self.available_params = {}
@@ -454,9 +460,29 @@ class PowerTrialAlignmentGUI:
                     return None
                 selected_params[param] = float(value_str)
             
-            # For now, we'll use a simple approach - just return the first experiment
-            # In a full implementation, we'd need to map parameters to experiment indices
-            return 0
+            # Prefer explicit per-experiment parameters if available
+            if getattr(self, 'experiment_parameters', None) is not None:
+                ep = self.experiment_parameters
+                p = selected_params['period']
+                y = selected_params['yaw_amplitude']
+                r = selected_params['roll_angle']
+                f = selected_params['flow_speed']
+                # Tolerant float match
+                tol = 1e-6
+                mask = (
+                    (np.abs(ep[:, 0] - p) < tol) &
+                    (np.abs(ep[:, 1] - y) < tol) &
+                    (np.abs(ep[:, 2] - r) < tol) &
+                    (np.abs(ep[:, 3] - f) < tol)
+                )
+                idxs = np.where(mask)[0]
+                if idxs.size > 0:
+                    return int(idxs[0])
+                else:
+                    return None
+            
+            # Fallback: if full factorial and known ordering, compute index; else return None
+            return None
             
         except (ValueError, IndexError) as e:
             return None
@@ -473,7 +499,7 @@ class PowerTrialAlignmentGUI:
         self.current_experiment_index = exp_idx
         
         # Set trial length based on period
-        period = float(self.period_var.get())
+        period = float(self.param_vars['period'].get())
         self.set_trial_length_for_period(period)
         
         # Update status

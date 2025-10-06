@@ -51,7 +51,7 @@ class PowerStrokeTrialProcessor:
         
         # Filtering parameters
         self.median_window = 11
-        self.lowpass_cutoff = 4.0
+        self.lowpass_cutoff = 8.0
         
     def load_data(self):
         """Load the input HDF5 data (same structure as GUI)"""
@@ -61,22 +61,25 @@ class PowerStrokeTrialProcessor:
             # Load main data array (3, 264, 7500) - thrust, lift, arduino
             self.data = f['data'][:]
             
-            # Load parameter combinations (it's a group with separate datasets)
-            param_group = f['parameter_combinations']
-            unique_periods = param_group['periods'][:]
-            unique_yaw_amplitudes = param_group['yaw_amplitudes'][:]
-            unique_roll_angles = param_group['roll_angles'][:]
-            unique_flow_speeds = param_group['flow_speeds'][:]
-            
-            # Create all parameter combinations
-            combinations = []
-            for period in unique_periods:
-                for yaw in unique_yaw_amplitudes:
-                    for roll in unique_roll_angles:
-                        for flow in unique_flow_speeds:
-                            combinations.append([period, yaw, roll, flow])
-            
-            self.parameter_combinations = np.array(combinations)
+            # Prefer per-experiment parameters saved by the loader
+            if 'experiment_parameters' in f:
+                # Columns: [period, yaw_amplitude, roll_angle, flow_speed]
+                self.parameter_combinations = f['experiment_parameters'][:]
+            else:
+                # Fallback: construct Cartesian product (order may not align with data!)
+                param_group = f['parameter_combinations']
+                unique_periods = param_group['periods'][:]
+                unique_yaw_amplitudes = param_group['yaw_amplitudes'][:]
+                unique_roll_angles = param_group['roll_angles'][:]
+                unique_flow_speeds = param_group['flow_speeds'][:]
+
+                combinations = []
+                for period in unique_periods:
+                    for yaw in unique_yaw_amplitudes:
+                        for roll in unique_roll_angles:
+                            for flow in unique_flow_speeds:
+                                combinations.append([period, yaw, roll, flow])
+                self.parameter_combinations = np.array(combinations)
             
             # Load settings
             self.settings = {}
@@ -90,11 +93,11 @@ class PowerStrokeTrialProcessor:
         print(f"Number of experiments: {self.data.shape[1]}")
         print(f"Parameter combinations: {self.parameter_combinations.shape}")
         
-        # Extract unique parameter values
-        self.periods = unique_periods
-        self.yaw_amplitudes = unique_yaw_amplitudes
-        self.roll_angles = unique_roll_angles
-        self.flow_speeds = unique_flow_speeds
+        # Extract unique parameter values from per-experiment parameters to preserve labels
+        self.periods = np.unique(self.parameter_combinations[:, 0])
+        self.yaw_amplitudes = np.unique(self.parameter_combinations[:, 1])
+        self.roll_angles = np.unique(self.parameter_combinations[:, 2])
+        self.flow_speeds = np.unique(self.parameter_combinations[:, 3])
         
         print(f"Parameters: {len(self.periods)} periods, {len(self.yaw_amplitudes)} yaw amplitudes, "
               f"{len(self.roll_angles)} roll angles, {len(self.flow_speeds)} flow speeds")

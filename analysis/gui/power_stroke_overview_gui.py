@@ -1,6 +1,3 @@
-
-
-
 #!/usr/bin/env python3
 """
 Power-Stroke Overview Metrics GUI
@@ -411,7 +408,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         except Exception:
             vec_sel = None
 
-        variable_types = [('Flow', 0), ('Sweep', 1), ('Overlap', 2)]
+        variable_types = [('Flow', 0), ('Sweep', 1)]
         channels = [('Thrust', 'thrust'), ('Lift', 'lift')]
 
         # Mean plots
@@ -1298,11 +1295,9 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.mean_force_variable_group = QButtonGroup()
         self.mean_force_flow_radio = QRadioButton("Flow")
         self.mean_force_sweep_radio = QRadioButton("Sweep")
-        self.mean_force_overlap_radio = QRadioButton("Overlap")
         
         self.mean_force_variable_group.addButton(self.mean_force_flow_radio, 0)
         self.mean_force_variable_group.addButton(self.mean_force_sweep_radio, 1)
-        self.mean_force_variable_group.addButton(self.mean_force_overlap_radio, 2)
         self.mean_force_flow_radio.setChecked(True)
         
         # Connect radio button changes to update controls
@@ -1310,14 +1305,14 @@ class PowerStrokeOverviewGUI(QMainWindow):
         
         var_layout.addWidget(self.mean_force_flow_radio)
         var_layout.addWidget(self.mean_force_sweep_radio)
-        var_layout.addWidget(self.mean_force_overlap_radio)
+        # No overlap in Power stroke
         top_layout.addWidget(var_frame)
         
         # Fixed Parameters Display (compact)
         mf_fixed_frame = QGroupBox("Fixed Parameters")
         mf_fixed_layout = QHBoxLayout(mf_fixed_frame)
         mf_fixed_layout.setContentsMargins(5, 5, 5, 5)
-        self.mean_force_fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
+        self.mean_force_fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s")
         mf_fixed_layout.addWidget(self.mean_force_fixed_params_label)
         top_layout.addWidget(mf_fixed_frame)
         
@@ -1335,6 +1330,13 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.plot_mean_force_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
         plot_control_layout.addWidget(self.plot_mean_force_button)
         top_layout.addWidget(plot_control_frame)
+        
+        # Twist selection (checkbox row)
+        self.mean_twist_box = QGroupBox("Twists")
+        self.mean_twist_layout = QHBoxLayout(self.mean_twist_box)
+        self.mean_twist_layout.setContentsMargins(5, 5, 5, 5)
+        self.mean_twist_checks = {}
+        top_layout.addWidget(self.mean_twist_box)
         
         # Variable Parameter Controls (per value marker + toggle)
         self.mean_force_var_controls_frame = QGroupBox("Variable Parameter Controls")
@@ -1532,21 +1534,19 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.peak_variable_group = QButtonGroup()
         self.peak_flow_radio = QRadioButton("Flow")
         self.peak_sweep_radio = QRadioButton("Sweep")
-        self.peak_overlap_radio = QRadioButton("Overlap")
         self.peak_variable_group.addButton(self.peak_flow_radio, 0)
         self.peak_variable_group.addButton(self.peak_sweep_radio, 1)
-        self.peak_variable_group.addButton(self.peak_overlap_radio, 2)
         self.peak_flow_radio.setChecked(True)
         var_layout.addWidget(self.peak_flow_radio)
         var_layout.addWidget(self.peak_sweep_radio)
-        var_layout.addWidget(self.peak_overlap_radio)
+        # No overlap in Power stroke
         top_layout.addWidget(var_frame)
 
         # Fixed Parameters (compact)
         peak_fixed = QGroupBox("Fixed Parameters")
         peak_fixed_layout = QHBoxLayout(peak_fixed)
         peak_fixed_layout.setContentsMargins(5, 5, 5, 5)
-        self.peak_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
+        self.peak_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s")
         peak_fixed_layout.addWidget(self.peak_fixed_params_label)
         top_layout.addWidget(peak_fixed)
 
@@ -1564,6 +1564,13 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.plot_peak_location_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
         plot_control_layout.addWidget(self.plot_peak_location_button)
         top_layout.addWidget(plot_control_frame)
+        
+        # Twist selection (checkbox row)
+        self.peak_twist_box = QGroupBox("Twists")
+        self.peak_twist_layout = QHBoxLayout(self.peak_twist_box)
+        self.peak_twist_layout.setContentsMargins(5, 5, 5, 5)
+        self.peak_twist_checks = {}
+        top_layout.addWidget(self.peak_twist_box)
 
         # Variable Parameter Controls (marker style + toggle per value)
         self.peak_var_controls_frame = QGroupBox("Variable Parameter Controls")
@@ -1750,6 +1757,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
             row.addStretch()
             self.peak_var_controls_layout.addWidget(row_widget)
             self.peak_parameter_controls[value] = {'marker': mc, 'toggle': tg}
+        # Populate twist checkboxes
+        self._populate_twist_checkboxes(target='peak')
         
     def create_vector_tab(self):
         """Create the vector tab - selection like Mean/Peak; color by twist; style by variable."""
@@ -1769,21 +1778,19 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.vec_variable_group = QButtonGroup()
         self.vec_flow_radio = QRadioButton("Flow")
         self.vec_sweep_radio = QRadioButton("Sweep")
-        self.vec_overlap_radio = QRadioButton("Overlap")
         self.vec_variable_group.addButton(self.vec_flow_radio, 0)
         self.vec_variable_group.addButton(self.vec_sweep_radio, 1)
-        self.vec_variable_group.addButton(self.vec_overlap_radio, 2)
         self.vec_flow_radio.setChecked(True)
         var_layout.addWidget(self.vec_flow_radio)
         var_layout.addWidget(self.vec_sweep_radio)
-        var_layout.addWidget(self.vec_overlap_radio)
+        # No overlap in Power stroke
         top_layout.addWidget(var_frame)
 
         # Fixed params label (compact)
         vec_fixed = QGroupBox("Fixed Parameters")
         vec_fixed_layout = QHBoxLayout(vec_fixed)
         vec_fixed_layout.setContentsMargins(5, 5, 5, 5)
-        self.vec_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
+        self.vec_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s")
         vec_fixed_layout.addWidget(self.vec_fixed_params_label)
         top_layout.addWidget(vec_fixed)
 
@@ -1808,6 +1815,13 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.vec_head_l.setMaximumWidth(50)
         plot_control_layout.addWidget(self.vec_head_l)
         top_layout.addWidget(plot_control_frame)
+        
+        # Twist selection (checkbox row)
+        self.vec_twist_box = QGroupBox("Twists")
+        self.vec_twist_layout = QHBoxLayout(self.vec_twist_box)
+        self.vec_twist_layout.setContentsMargins(5, 5, 5, 5)
+        self.vec_twist_checks = {}
+        top_layout.addWidget(self.vec_twist_box)
 
         # Variable Parameter Controls (style toggle)
         self.vec_var_controls_frame = QGroupBox("Variable Parameter Controls")
@@ -1937,6 +1951,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
             row.addStretch()
             self.vec_var_controls_layout.addWidget(row_widget)
             self.vec_parameter_controls[value] = {'style': style, 'toggle': tg}
+        # Populate twist checkboxes
+        self._populate_twist_checkboxes(target='vec')
         
     def create_mean_overview_tab(self):
         """Create the Mean Overview tab with decoupled data selection"""
@@ -1950,18 +1966,16 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.variable_group = QButtonGroup()
         self.flow_radio = QRadioButton("Flow")
         self.sweep_radio = QRadioButton("Sweep") 
-        self.overlap_radio = QRadioButton("Overlap")
         
         self.variable_group.addButton(self.flow_radio, 0)
         self.variable_group.addButton(self.sweep_radio, 1)
-        self.variable_group.addButton(self.overlap_radio, 2)
         
         self.flow_radio.setChecked(True)  # Default to Flow
         
         radio_layout = QHBoxLayout()
         radio_layout.addWidget(self.flow_radio)
         radio_layout.addWidget(self.sweep_radio)
-        radio_layout.addWidget(self.overlap_radio)
+        # No overlap in Power stroke
         radio_layout.addStretch()
         var_layout.addLayout(radio_layout)
         
@@ -1974,7 +1988,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         fixed_frame = QGroupBox("Fixed Parameters")
         fixed_layout = QHBoxLayout(fixed_frame)
         
-        self.fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s | Overlap: 0.5")
+        self.fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s")
         fixed_layout.addWidget(self.fixed_params_label)
         fixed_layout.addStretch()
         
@@ -2244,9 +2258,12 @@ class PowerStrokeOverviewGUI(QMainWindow):
             m = self._param_map(exp_data.get('parameters', {}))
             if variable_type == "flow":
                 # For flow: fix sweep=80, period=2.25, vary flow
+                # Restrict flows to allowed set 0, 0.05, 0.1
+                allowed_flows = {0.0, 0.05, 0.1}
                 if (abs(m['sweep'] - 80) < 1e-6 and
                     abs(m['stroke_period'] - 2.25) < 1e-6 and
-                    abs(m['flow'] - float(param_value)) < 1e-6):
+                    abs(m['flow'] - float(param_value)) < 1e-6 and
+                    float(param_value) in allowed_flows):
                     matching_experiments.append(exp_key)
                     print(f"  Found flow match: {exp_key}")
             elif variable_type == "sweep":
@@ -2382,17 +2399,20 @@ class PowerStrokeOverviewGUI(QMainWindow):
         channel = self.mean_force_channel.currentText().lower()
         
         # Determine variable type
-        if self.mean_force_flow_radio.isChecked():
+        if hasattr(self, 'mean_force_flow_radio') and self.mean_force_flow_radio.isChecked():
             variable_type = "flow"
-        elif self.mean_force_sweep_radio.isChecked():
+        elif hasattr(self, 'mean_force_sweep_radio') and self.mean_force_sweep_radio.isChecked():
             variable_type = "sweep"
         else:
-            variable_type = "overlap"
+            variable_type = "flow"
         
         # Clear previous plot
         self.mean_force_figure.clear()
         ax = self.mean_force_figure.add_subplot(111)
         
+        # Build selected twist set from checkboxes (if any)
+        selected_twists = self._get_selected_twists('mean')
+
         # Collect and plot for each enabled parameter value
         for param_value, controls in self.mean_force_parameter_controls.items():
             if not controls['toggle'].isChecked():
@@ -2410,6 +2430,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
                 exp_data = self.data['experiments'][exp_key]
                 params = exp_data['parameters']
                 twist = abs(params.get('roll_angle', 0))
+                if selected_twists is not None and twist not in selected_twists:
+                    continue
                 
                 time_vector = exp_data.get('time_vector', [])
                 if channel == 'thrust':
@@ -2569,6 +2591,9 @@ class PowerStrokeOverviewGUI(QMainWindow):
             self.mean_force_var_controls_layout.addWidget(row_widget)
             self.mean_force_parameter_controls[value] = {'marker': marker_combo, 'toggle': toggle}
         
+        # Populate twist checkboxes
+        self._populate_twist_checkboxes(target='mean')
+        
     def plot_peak_location(self):
         """Plot peak location with variable selection; color by twist palette."""
         if not self.data or 'experiments' not in self.data:
@@ -2576,12 +2601,12 @@ class PowerStrokeOverviewGUI(QMainWindow):
             return
 
         # Determine variable type like Mean Force
-        if self.peak_flow_radio.isChecked():
+        if hasattr(self, 'peak_flow_radio') and self.peak_flow_radio.isChecked():
             variable_type = "flow"
-        elif self.peak_sweep_radio.isChecked():
+        elif hasattr(self, 'peak_sweep_radio') and self.peak_sweep_radio.isChecked():
             variable_type = "sweep"
         else:
-            variable_type = "overlap"
+            variable_type = "flow"
 
         channel = self.peak_location_channel.currentText().lower()
 
@@ -2609,6 +2634,28 @@ class PowerStrokeOverviewGUI(QMainWindow):
             kernel = np.ones(w, dtype=float) / float(w)
             return np.convolve(y, kernel, mode='same')
 
+        # Build an optional comma-separated twist filter text box if not present
+        if not hasattr(self, 'peak_twist_filter'):
+            try:
+                filter_row = QWidget()
+                frl = QHBoxLayout(filter_row)
+                frl.setContentsMargins(5, 0, 5, 0)
+                frl.addWidget(QLabel("Twist filter (deg, comma-separated, optional):"))
+                self.peak_twist_filter = QLineEdit("")
+                self.peak_twist_filter.setPlaceholderText("e.g. 0,15,30,45,60,75,90")
+                self.peak_twist_filter.setMaximumWidth(300)
+                frl.addWidget(self.peak_twist_filter)
+                frl.addStretch()
+                # Insert above the plot? Assume there is a layout available
+                # If not available, ignore silently
+                if hasattr(self, 'peak_location_controls_frame') and self.peak_location_controls_frame:
+                    self.peak_location_controls_frame.layout().addWidget(filter_row)
+            except Exception:
+                pass
+
+        # Selected twists from checkboxes
+        selected_twists = self._get_selected_twists('peak')
+
         # Iterate parameter values selected
         for param_value, ctrl in list(self.peak_parameter_controls.items()):
             if not _enabled(param_value):
@@ -2622,6 +2669,9 @@ class PowerStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
+                # Apply optional twist filter
+                if 'twist' in m and selected_twists is not None and m['twist'] not in selected_twists:
+                    continue
                 t_abs = np.asarray(exp.get('time_vector', []))
                 if channel == 'thrust':
                     ysig = np.asarray(exp.get('thrust_mean', []))
@@ -2636,51 +2686,16 @@ class PowerStrokeOverviewGUI(QMainWindow):
                     continue
                 phase_seg = t_abs[mask]
                 y_seg = ysig[mask]
-                # Light smoothing for stable extrema detection
+                # Smoothing and first peak only (Power stroke): first significant extremum after min_time
                 y_sm = _smooth_signal(y_seg, window_size=5)
-                # Detect local maxima and minima
-                y1 = y_sm[1:-1]
-                prev = y_sm[:-2]
-                nxt = y_sm[2:]
-                max_idx = np.where((y1 > prev) & (y1 >= nxt))[0] + 1
-                min_idx = np.where((y1 < prev) & (y1 <= nxt))[0] + 1
-
-                # Dynamic threshold scaled to signal amplitude
                 amp = float(np.nanmax(np.abs(y_sm))) if y_sm.size > 0 else 0.0
                 thr = max(0.15, 0.12 * amp)
-
                 pts = []
-                if channel == 'lift':
-                    # Early positive peak: search in [min_time, 0.20s]
-                    early = (phase_seg >= min_time) & (phase_seg <= 0.20)
-                    pos_idx = [i for i in max_idx if early[i] and (y_sm[i] >= thr)]
-                    if len(pos_idx) > 0:
-                        i_pos = int(pos_idx[np.argmax([y_sm[i] for i in pos_idx])])
-                        pts.append((float(phase_seg[i_pos]), float(y_seg[i_pos])))
-                    # Later negative peak: search in [0.20s, max]
-                    late = (phase_seg >= 0.20)
-                    neg_idx = [i for i in min_idx if late[i] and (y_sm[i] <= -0.9*thr)]
-                    if len(neg_idx) > 0:
-                        i_neg = int(neg_idx[np.argmin([y_sm[i] for i in neg_idx])])
-                        pts.append((float(phase_seg[i_neg]), float(y_seg[i_neg])))
-                    else:
-                        # Fallback for broad troughs: pick global min in late window if sufficiently negative
-                        if np.any(late):
-                            candidates = np.where(late)[0]
-                            i_local = int(np.argmin(y_sm[candidates]))
-                            i_neg = int(candidates[i_local])
-                            if y_sm[i_neg] <= -0.5*thr:
-                                pts.append((float(phase_seg[i_neg]), float(y_seg[i_neg])))
-                else:
-                    # Thrust: fallback to two strongest extrema by |value|
-                    cand_idx = np.concatenate([max_idx, min_idx])
-                    if cand_idx.size == 0:
-                        cand_idx = np.array([int(np.argmax(np.abs(y_sm)))])
-                    order = np.argsort(-np.abs(y_sm[cand_idx]))
-                    cand_idx = cand_idx[order]
-                    keep = [i for i in cand_idx if np.abs(y_sm[i]) >= thr]
-                    for i in keep[:2]:
-                        pts.append((float(phase_seg[i]), float(y_seg[i])))
+                idxs = np.where((np.abs(y_sm) >= thr))[0]
+                idxs = [i for i in idxs if phase_seg[i] >= min_time]
+                if len(idxs) > 0:
+                    i = int(idxs[0])
+                    pts.append((float(phase_seg[i]), float(y_seg[i])))
 
                 if len(pts) == 0:
                     continue
@@ -2743,7 +2758,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         elif self.vec_sweep_radio.isChecked():
             variable_type = "sweep"
         else:
-            variable_type = "overlap"
+            variable_type = "flow"
         
         # Clear previous plot
         self.vector_figure.clear()
@@ -2775,6 +2790,9 @@ class PowerStrokeOverviewGUI(QMainWindow):
             ctrl = self.vec_parameter_controls.get(val)
             return ctrl['style'].currentText() if ctrl else '-'
         
+        # Selected twists from checkboxes
+        selected_twists = self._get_selected_twists('vec')
+
         # Iterate values
         for param_value, ctrl in list(self.vec_parameter_controls.items()):
             if not _enabled(param_value):
@@ -2786,6 +2804,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
+                if selected_twists is not None and m.get('twist', 0.0) not in selected_twists:
+                    continue
                 t_abs = np.asarray(exp.get('time_vector', []))
                 thrust = np.asarray(exp.get('thrust_mean', []))
                 lift = np.asarray(exp.get('lift_mean', []))
@@ -3359,6 +3379,59 @@ class PowerStrokeOverviewGUI(QMainWindow):
     def closeEvent(self, event):
         """Handle application close event"""
         event.accept()
+
+    def _get_available_twist_values(self):
+        twists = set()
+        if not self.data or 'experiments' not in self.data:
+            return twists
+        for exp_data in self.data['experiments'].values():
+            m = self._param_map(exp_data.get('parameters', {}))
+            twists.add(m.get('twist', 0.0))
+        return sorted(twists)
+    
+    def _populate_twist_checkboxes(self, target: str):
+        # target in {'mean','peak','vec'}
+        twists = self._get_available_twist_values()
+        if target == 'mean' and hasattr(self, 'mean_twist_layout'):
+            layout = self.mean_twist_layout; store = 'mean_twist_checks'
+        elif target == 'peak' and hasattr(self, 'peak_twist_layout'):
+            layout = self.peak_twist_layout; store = 'peak_twist_checks'
+        elif target == 'vec' and hasattr(self, 'vec_twist_layout'):
+            layout = self.vec_twist_layout; store = 'vec_twist_checks'
+        else:
+            return
+        # Clear existing
+        try:
+            while layout.count():
+                item = layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        except RuntimeError:
+            pass
+        # Build row of checkboxes: | [x] 0° | [x] 15° | ... |
+        checks = {}
+        allowed_default = {0, 15, 30, 45, 60, 75, 90}
+        for t in twists:
+            w = QWidget(); hl = QHBoxLayout(w); hl.setContentsMargins(4,0,4,0)
+            cb = QCheckBox(f"{int(t)}°")
+            checked = int(round(float(t))) in allowed_default
+            cb.setChecked(checked)
+            hl.addWidget(cb); layout.addWidget(w)
+            checks[t] = cb
+        layout.addStretch()
+        setattr(self, store, checks)
+
+    def _get_selected_twists(self, target: str):
+        checks_attr = None
+        if target == 'mean' and hasattr(self, 'mean_twist_checks'):
+            checks_attr = self.mean_twist_checks
+        elif target == 'peak' and hasattr(self, 'peak_twist_checks'):
+            checks_attr = self.peak_twist_checks
+        elif target == 'vec' and hasattr(self, 'vec_twist_checks'):
+            checks_attr = self.vec_twist_checks
+        if not checks_attr:
+            return None
+        return {t for t, cb in checks_attr.items() if cb.isChecked()}
 
 def main():
     """Main application entry point"""
