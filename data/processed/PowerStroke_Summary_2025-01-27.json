@@ -1,0 +1,85 @@
+{
+  "metadata": {
+    "experiment_type": "Power_Stroke",
+    "source_files": [
+      "14-Oct-2022_results_PowerStroke.mat",
+      "07-Oct-2022_results_PowerStroke.mat"
+    ],
+    "total_experiments": 264,
+    "experiments_from_14Oct": 132,
+    "experiments_from_07Oct": 132,
+    "creation_date": "2025-10-06T14:29:36.153600",
+    "data_shape": [
+      3,
+      264,
+      7500
+    ],
+    "sampling_rate": 500.0,
+    "channels": [
+      "thrust",
+      "lift",
+      "arduino"
+    ],
+    "corrections_applied": {
+      "yaw_amplitudes": "Flipped signs and corrected values: [-90\u00b0, -75\u00b0, -60\u00b0] -> [90\u00b0, 80\u00b0, 70\u00b0]",
+      "roll_angles": "Flipped signs to positive values",
+      "flow_speeds": "Converted motor power to flow speed: 0->0 m/s, 28->0.05 m/s, 70->0.1 m/s, 100->0.13 m/s"
+    }
+  },
+  "parameter_combinations": {
+    "periods": [
+      1.75,
+      2.25
+    ],
+    "yaw_amplitudes": [
+      70.0,
+      80.0,
+      90.0
+    ],
+    "roll_angles": [
+      0.0,
+      15.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      75.0,
+      90.0
+    ],
+    "flow_speeds": [
+      0.0,
+      0.05,
+      0.1,
+      0.13
+    ]
+  },
+  "data_statistics": {
+    "total_experiments": 264,
+    "data_length_per_experiment": 7500,
+    "sampling_rate_hz": 500.0,
+    "total_duration_per_experiment_seconds": 15.0,
+    "data_ranges": {
+      "thrust": {
+        "min": -3.110727872517464,
+        "max": 3.3425239868392254,
+        "mean": -0.04000428071738548,
+        "std": 0.39500809331131204
+      },
+      "lift": {
+        "min": -4.168582891566547,
+        "max": 3.5327364331211513,
+        "mean": -0.4748025783343158,
+        "std": 0.4171809990613163
+      },
+      "arduino": {
+        "min": -1.0667587680481456,
+        "max": 4.343250043659697,
+        "mean": 0.45450032097895393,
+        "std": 1.2171585739050212
+      }
+    }
+  }
+}
