@@ -32,10 +32,27 @@ def _param_map(params: Dict[str, Any]) -> Dict[str, float]:
     twist_raw = params.get('roll_angle', params.get('twist', 0.0))
     overlap = params.get('paddle_transition', params.get('phase_overlap', 0.0))
     
+    # Apply Paddle-specific corrections
+    # 1) Sweep relabel: 60->70, 75->80, 90->90, 105->100
+    try:
+        sweep_abs = abs(float(sweep_raw))
+    except Exception:
+        sweep_abs = 0.0
+    sweep_map = {60.0: 70.0, 75.0: 80.0, 90.0: 90.0, 105.0: 100.0}
+    sweep_fixed = sweep_map.get(sweep_abs, sweep_abs)
+
+    # 2) Flow mapping (motor power -> m/s): 0->0.0, 70->0.1
+    try:
+        flow_raw = float(flow)
+    except Exception:
+        flow_raw = 0.0
+    flow_map = {0.0: 0.0, 70.0: 0.1}
+    flow_fixed = flow_map.get(flow_raw, flow_raw)
+
     return {
-        'flow': float(flow),
+        'flow': float(flow_fixed),
         'stroke_period': float(period),
-        'sweep': float(abs(sweep_raw)),
+        'sweep': float(sweep_fixed),
         'twist': float(abs(twist_raw)),
         'overlap': float(overlap)
     }
@@ -172,7 +189,7 @@ def process_files(paths: List[str], out_path: str, resample_n: int = 1001) -> No
     with h5py.File(out_path, 'w') as f:
         # Create datasets for each parameter group
         for (flow, sweep, twist, period, overlap), trials in groups.items():
-            group_name = f"flow_{flow:.1f}_sweep_{sweep:.0f}_twist_{twist:.0f}_period_{period:.2f}_overlap_{overlap:.2f}"
+            group_name = f"flow_{flow:.2f}_sweep_{sweep:.0f}_twist_{twist:.0f}_period_{period:.2f}_overlap_{overlap:.2f}"
             grp = f.create_group(group_name)
             
             # Store parameters as attributes
