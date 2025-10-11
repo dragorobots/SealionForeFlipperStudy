@@ -117,6 +117,22 @@ class PaddleStrokeOverviewGUI(QMainWindow):
             'twist': set(),
         }
         self.dataset_rows = []
+        
+        # Full Stroke normalization windows (used for normalizing to [0,1])
+        # These are the reference windows from Full Stroke analysis
+        self.full_stroke_windows = {
+            1.75: {'start': 0.70, 'end': 1.75},  # 1.75s period: 1.05s duration
+            2.25: {'start': 0.90, 'end': 2.25}   # 2.25s period: 1.35s duration
+        }
+        
+        # Paddle stroke trimming windows (in paddle stroke's own time coordinates)
+        # These define where valid paddle stroke data exists (trimming artifacts)
+        # Paddle stroke data starts at 0 in its own coordinate system
+        self.paddle_stroke_windows = {
+            1.75: {'start': 0.0, 'end': 0.8},  # Default: use first 0.8s, user can adjust
+            2.25: {'start': 0.0, 'end': 0.8}   # Default: use first 0.8s, user can adjust
+        }
+        
         self.init_ui()
         # Ensure data loads at startup
         self.auto_load_data()
@@ -236,6 +252,12 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                 # Update UI
                 self.plot_button.setEnabled(True)
                 # Overview buttons removed - functionality moved to individual tabs
+                
+                # Populate normalization tab dropdowns
+                try:
+                    self.populate_paddle_norm_parameters()
+                except Exception:
+                    pass
                 
                 # Update data info
                 self.update_data_info()
@@ -474,9 +496,69 @@ class PaddleStrokeOverviewGUI(QMainWindow):
             pass
         self.statusBar().showMessage(f"Published overview plots to {outdir}")
 
-    def _normalize_time_vector(self, time_vector: np.ndarray) -> np.ndarray:
-        """Return absolute time; normalization disabled for Power stroke."""
-        return np.asarray(time_vector, dtype=float)
+    def _normalize_time_vector(self, time_vector: np.ndarray, period: float) -> np.ndarray:
+        """
+        Normalize absolute time to [0, 1] using FULL STROKE windows.
+        This ensures all GUIs use the same normalized scale.
+        
+        Args:
+            time_vector: Absolute time values in seconds
+            period: Stroke period (1.75 or 2.25)
+            
+        Returns:
+            Normalized time in [0, 1] range based on full stroke window
+        """
+        t = np.asarray(time_vector, dtype=float)
+        
+        # Get the FULL STROKE window for this period
+        if abs(period - 1.75) < 0.1:
+            window = self.full_stroke_windows[1.75]
+        elif abs(period - 2.25) < 0.1:
+            window = self.full_stroke_windows[2.25]
+        else:
+            # Fallback: use closest period window
+            if period < 2.0:
+                window = self.full_stroke_windows[1.75]
+            else:
+                window = self.full_stroke_windows[2.25]
+        
+        start_time = window['start']
+        end_time = window['end']
+        duration = end_time - start_time
+        
+        # Normalize: map full stroke [start_time, end_time] to [0, 1]
+        if duration > 0:
+            t_norm = (t - start_time) / duration
+        else:
+            t_norm = t * 0.0  # Return zeros if duration is invalid
+            
+        return t_norm
+    
+    def _get_paddle_stroke_mask(self, time_absolute: np.ndarray, period: float) -> np.ndarray:
+        """
+        Get mask for paddle stroke portion using absolute time values from paddle stroke data.
+        
+        Args:
+            time_absolute: Absolute time values in seconds (from paddle stroke data)
+            period: Stroke period (1.75 or 2.25)
+            
+        Returns:
+            Boolean mask for valid paddle stroke region (trimming artifacts)
+        """
+        # Get paddle stroke trimming window
+        if abs(period - 1.75) < 0.1:
+            paddle_window = self.paddle_stroke_windows[1.75]
+        elif abs(period - 2.25) < 0.1:
+            paddle_window = self.paddle_stroke_windows[2.25]
+        else:
+            if period < 2.0:
+                paddle_window = self.paddle_stroke_windows[1.75]
+            else:
+                paddle_window = self.paddle_stroke_windows[2.25]
+        
+        # Create mask for valid paddle stroke region (trimming artifacts at start/end)
+        mask = (time_absolute >= paddle_window['start']) & (time_absolute <= paddle_window['end'])
+        return mask
             
     def _seed_defaults(self):
         """Seed default values for dataset selectors (from original GUI)"""
@@ -769,13 +851,279 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         self.tab_widget = QTabWidget()
         parent.addWidget(self.tab_widget)
         
-        # Create tabs
+        # Create tabs (normalization first!)
+        self.create_paddle_normalization_tab()
         self.create_overview_settings_tab()
         self.create_traces_tab()
         self.create_mean_overview_tab()
         self.create_mean_force_tab()
         self.create_peak_location_tab()
         self.create_vector_tab()
+        
+    def create_paddle_normalization_tab(self):
+        """Create normalization tab for Paddle Stroke boundary selection"""
+        norm_widget = QWidget()
+        norm_layout = QHBoxLayout(norm_widget)
+        
+        # Left panel: Settings
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(10, 10, 10, 10)
+        left_panel.setMaximumWidth(500)
+        
+        title_label = QLabel("Paddle Stroke Normalization")
+        title_label.setFont(QFont("Arial", 14, QFont.Bold))
+        left_layout.addWidget(title_label)
+        
+        desc_label = QLabel(
+            "Define Paddle Stroke boundaries (absolute time in seconds).\n"
+            "Plot traces to visualize and trim artifacts at start/end."
+        )
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("color: #555; margin-bottom: 5px; font-size: 10px;")
+        left_layout.addWidget(desc_label)
+        
+        # Window settings
+        settings_frame = QGroupBox("Paddle Stroke Time Windows")
+        settings_layout = QVBoxLayout(settings_frame)
+        
+        # Period 1.75s
+        period_175_frame = QGroupBox("Period 1.75s")
+        period_175_layout = QGridLayout(period_175_frame)
+        period_175_layout.addWidget(QLabel("Start (s):"), 0, 0)
+        self.paddle_175_start = QDoubleSpinBox()
+        self.paddle_175_start.setRange(0.0, 10.0)
+        self.paddle_175_start.setSingleStep(0.05)
+        self.paddle_175_start.setDecimals(2)
+        self.paddle_175_start.setValue(self.paddle_stroke_windows[1.75]['start'])
+        period_175_layout.addWidget(self.paddle_175_start, 0, 1)
+        
+        period_175_layout.addWidget(QLabel("End (s):"), 0, 2)
+        self.paddle_175_end = QDoubleSpinBox()
+        self.paddle_175_end.setRange(0.0, 10.0)
+        self.paddle_175_end.setSingleStep(0.05)
+        self.paddle_175_end.setDecimals(2)
+        self.paddle_175_end.setValue(self.paddle_stroke_windows[1.75]['end'])
+        period_175_layout.addWidget(self.paddle_175_end, 0, 3)
+        
+        period_175_layout.addWidget(QLabel("Duration:"), 0, 4)
+        self.paddle_175_duration = QLabel()
+        self.paddle_175_duration.setStyleSheet("font-weight: bold; color: #0078d4;")
+        period_175_layout.addWidget(self.paddle_175_duration, 0, 5)
+        settings_layout.addWidget(period_175_frame)
+        
+        # Period 2.25s
+        period_225_frame = QGroupBox("Period 2.25s")
+        period_225_layout = QGridLayout(period_225_frame)
+        period_225_layout.addWidget(QLabel("Start (s):"), 0, 0)
+        self.paddle_225_start = QDoubleSpinBox()
+        self.paddle_225_start.setRange(0.0, 10.0)
+        self.paddle_225_start.setSingleStep(0.05)
+        self.paddle_225_start.setDecimals(2)
+        self.paddle_225_start.setValue(self.paddle_stroke_windows[2.25]['start'])
+        period_225_layout.addWidget(self.paddle_225_start, 0, 1)
+        
+        period_225_layout.addWidget(QLabel("End (s):"), 0, 2)
+        self.paddle_225_end = QDoubleSpinBox()
+        self.paddle_225_end.setRange(0.0, 10.0)
+        self.paddle_225_end.setSingleStep(0.05)
+        self.paddle_225_end.setDecimals(2)
+        self.paddle_225_end.setValue(self.paddle_stroke_windows[2.25]['end'])
+        period_225_layout.addWidget(self.paddle_225_end, 0, 3)
+        
+        period_225_layout.addWidget(QLabel("Duration:"), 0, 4)
+        self.paddle_225_duration = QLabel()
+        self.paddle_225_duration.setStyleSheet("font-weight: bold; color: #0078d4;")
+        period_225_layout.addWidget(self.paddle_225_duration, 0, 5)
+        settings_layout.addWidget(period_225_frame)
+        
+        left_layout.addWidget(settings_frame)
+        
+        # Trace selection
+        trace_sel_frame = QGroupBox("Trace Selection")
+        trace_sel_layout = QVBoxLayout(trace_sel_frame)
+        
+        chan_layout = QHBoxLayout()
+        chan_layout.addWidget(QLabel("Channel:"))
+        self.paddle_norm_channel = QComboBox()
+        self.paddle_norm_channel.addItems(["thrust", "lift"])
+        chan_layout.addWidget(self.paddle_norm_channel)
+        chan_layout.addStretch()
+        trace_sel_layout.addLayout(chan_layout)
+        
+        param_layout = QGridLayout()
+        param_layout.addWidget(QLabel("Flow:"), 0, 0)
+        self.paddle_norm_flow = QComboBox()
+        param_layout.addWidget(self.paddle_norm_flow, 0, 1)
+        
+        param_layout.addWidget(QLabel("Period:"), 1, 0)
+        self.paddle_norm_period = QComboBox()
+        param_layout.addWidget(self.paddle_norm_period, 1, 1)
+        
+        param_layout.addWidget(QLabel("Sweep:"), 2, 0)
+        self.paddle_norm_sweep = QComboBox()
+        param_layout.addWidget(self.paddle_norm_sweep, 2, 1)
+        
+        param_layout.addWidget(QLabel("Twist:"), 3, 0)
+        self.paddle_norm_twist = QComboBox()
+        param_layout.addWidget(self.paddle_norm_twist, 3, 1)
+        trace_sel_layout.addLayout(param_layout)
+        
+        plot_button = QPushButton("Plot Traces (Absolute Time)")
+        plot_button.setStyleSheet("QPushButton { background-color: #28a745; color: white; font-weight: bold; padding: 8px; }")
+        plot_button.clicked.connect(self.plot_paddle_normalization_traces)
+        trace_sel_layout.addWidget(plot_button)
+        
+        left_layout.addWidget(trace_sel_frame)
+        
+        # Apply button
+        apply_button = QPushButton("Apply Settings & Refresh Plot")
+        apply_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; padding: 8px; }")
+        apply_button.clicked.connect(self.apply_paddle_normalization)
+        left_layout.addWidget(apply_button)
+        
+        left_layout.addStretch()
+        
+        # Right panel: Plot
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(5, 5, 5, 5)
+        
+        plot_title = QLabel("Paddle Stroke Trace Visualization (Absolute Time)")
+        plot_title.setFont(QFont("Arial", 12, QFont.Bold))
+        right_layout.addWidget(plot_title)
+        
+        self.paddle_norm_figure = Figure(figsize=(10, 6), dpi=100)
+        self.paddle_norm_ax = self.paddle_norm_figure.add_subplot(111)
+        self.paddle_norm_ax.grid(True, alpha=0.3)
+        self.paddle_norm_ax.set_xlabel('Absolute Time (seconds)', fontsize=11)
+        self.paddle_norm_ax.set_ylabel('Force (scaled)', fontsize=11)
+        self.paddle_norm_canvas = FigureCanvas(self.paddle_norm_figure)
+        right_layout.addWidget(self.paddle_norm_canvas)
+        
+        norm_layout.addWidget(left_panel)
+        norm_layout.addWidget(right_panel)
+        
+        self.tab_widget.addTab(norm_widget, "Normalization")
+        
+        # Connect updates
+        self.paddle_175_start.valueChanged.connect(self.update_paddle_norm_display)
+        self.paddle_175_end.valueChanged.connect(self.update_paddle_norm_display)
+        self.paddle_225_start.valueChanged.connect(self.update_paddle_norm_display)
+        self.paddle_225_end.valueChanged.connect(self.update_paddle_norm_display)
+        
+        self.update_paddle_norm_display()
+        
+    def populate_paddle_norm_parameters(self):
+        """Populate normalization tab parameter dropdowns"""
+        if not self.param_index:
+            return
+            
+        # Populate flow
+        flow_values = ['All'] + [str(v) for v in sorted(self.param_index.get('flow', []))]
+        self.paddle_norm_flow.clear()
+        self.paddle_norm_flow.addItems(flow_values)
+        
+        # Populate period
+        period_values = ['All'] + [f"{v:.2f}" if abs(v - round(v)) > 1e-6 else str(int(v)) 
+                                     for v in sorted(self.param_index.get('period', []))]
+        self.paddle_norm_period.clear()
+        self.paddle_norm_period.addItems(period_values)
+        
+        # Populate sweep
+        sweep_values = ['All'] + [str(int(v)) for v in sorted(self.param_index.get('sweep', []))]
+        self.paddle_norm_sweep.clear()
+        self.paddle_norm_sweep.addItems(sweep_values)
+        
+        # Populate twist
+        twist_values = ['All'] + [str(int(v)) for v in sorted(self.param_index.get('twist', []))]
+        self.paddle_norm_twist.clear()
+        self.paddle_norm_twist.addItems(twist_values)
+    
+    def update_paddle_norm_display(self):
+        """Update paddle stroke normalization display"""
+        dur_175 = self.paddle_175_end.value() - self.paddle_175_start.value()
+        dur_225 = self.paddle_225_end.value() - self.paddle_225_start.value()
+        self.paddle_175_duration.setText(f"{dur_175:.2f} s")
+        self.paddle_225_duration.setText(f"{dur_225:.2f} s")
+        
+    def apply_paddle_normalization(self):
+        """Apply paddle stroke normalization settings"""
+        self.paddle_stroke_windows[1.75]['start'] = self.paddle_175_start.value()
+        self.paddle_stroke_windows[1.75]['end'] = self.paddle_175_end.value()
+        self.paddle_stroke_windows[2.25]['start'] = self.paddle_225_start.value()
+        self.paddle_stroke_windows[2.25]['end'] = self.paddle_225_end.value()
+        self.plot_paddle_normalization_traces()
+        self.statusBar().showMessage("Paddle stroke normalization applied")
+        
+    def plot_paddle_normalization_traces(self):
+        """Plot paddle stroke traces with absolute time"""
+        if not self.data or 'experiments' not in self.data:
+            QMessageBox.warning(self, "No Data", "Please load data first")
+            return
+            
+        self.paddle_norm_ax.clear()
+        self.paddle_norm_ax.grid(True, alpha=0.3)
+        
+        channel = self.paddle_norm_channel.currentText()
+        flow_filter = self.paddle_norm_flow.currentText()
+        period_filter = self.paddle_norm_period.currentText()
+        sweep_filter = self.paddle_norm_sweep.currentText()
+        twist_filter = self.paddle_norm_twist.currentText()
+        
+        plotted_count = 0
+        colors = plt.cm.tab10(np.linspace(0, 1, 10))
+        
+        for exp_key, exp_data in self.data['experiments'].items():
+            params = exp_data['parameters']
+            m = self._param_map(params)
+            
+            # Apply all filters
+            if flow_filter != 'All' and abs(m['flow'] - float(flow_filter)) > 1e-6:
+                continue
+            if period_filter != 'All' and abs(m['stroke_period'] - float(period_filter)) > 1e-6:
+                continue
+            if sweep_filter != 'All' and abs(m['sweep'] - float(sweep_filter)) > 1e-6:
+                continue
+            if twist_filter != 'All' and abs(m['twist'] - float(twist_filter)) > 1e-6:
+                continue
+                
+            t_abs = np.asarray(exp_data['time_vector'])
+            if channel == 'thrust':
+                force = np.asarray(exp_data['thrust_mean'])
+            else:
+                force = np.asarray(exp_data['lift_mean'])
+                
+            if len(t_abs) == 0 or len(force) == 0:
+                continue
+                
+            color = colors[plotted_count % len(colors)]
+            label = f"F={m['flow']}, P={m['stroke_period']}, S={int(m['sweep'])}, T={int(m['twist'])}"
+            self.paddle_norm_ax.plot(t_abs, force, linewidth=1.5, alpha=0.7, color=color, label=label)
+            plotted_count += 1
+            
+            if plotted_count >= 5:
+                break
+        
+        if plotted_count > 0:
+            # Show paddle stroke boundaries
+            if period_filter != 'All':
+                period = float(period_filter)
+                if abs(period - 1.75) < 0.1:
+                    window = self.paddle_stroke_windows[1.75]
+                else:
+                    window = self.paddle_stroke_windows[2.25]
+                    
+                self.paddle_norm_ax.axvline(x=window['start'], color='blue', linestyle='--', linewidth=2, label=f"Paddle start ({window['start']:.2f}s)")
+                self.paddle_norm_ax.axvline(x=window['end'], color='blue', linestyle='--', linewidth=2, label=f"Paddle end ({window['end']:.2f}s)")
+                self.paddle_norm_ax.axvspan(window['start'], window['end'], alpha=0.1, color='blue')
+            
+            self.paddle_norm_ax.legend(loc='best', fontsize=8)
+            
+        self.paddle_norm_ax.set_xlabel('Absolute Time (seconds)', fontsize=11)
+        self.paddle_norm_ax.set_ylabel(f'{channel.capitalize()} Force', fontsize=11)
+        self.paddle_norm_ax.set_title('Paddle Stroke Boundary Selection', fontsize=12, fontweight='bold')
+        self.paddle_norm_canvas.draw()
         
     def create_traces_tab(self):
         """Create the traces tab with EXACT original GUI structure"""
@@ -934,6 +1282,18 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         
         ctrl_layout.addWidget(pub_frame)
         
+        # Normalization toggle
+        norm_toggle_frame = QGroupBox("Normalization Control")
+        norm_toggle_layout = QHBoxLayout(norm_toggle_frame)
+        
+        self.include_norm_window = QCheckBox("Include Normalization Window")
+        self.include_norm_window.setChecked(True)  # Default to enabled
+        self.include_norm_window.setToolTip("When checked, applies user-defined trimming from Normalization tab. When unchecked, plots full traces.")
+        norm_toggle_layout.addWidget(self.include_norm_window)
+        norm_toggle_layout.addStretch()
+        
+        ctrl_layout.addWidget(norm_toggle_frame)
+        
         # Plot button (EXACT copy)
         self.plot_button = QPushButton("Plot")
         self.plot_button.clicked.connect(self.plot_overlay)
@@ -1087,19 +1447,43 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                     continue
                     
                 exp_data = self.data['experiments'][exp_key]
-                # Use absolute time directly; no normalization for Paddle stroke
-                t = np.asarray(exp_data['time_vector'])
-                # Use absolute time directly; no normalization window
-                mask_domain = np.ones_like(t, dtype=bool)
+                t_abs = np.asarray(exp_data['time_vector'])
+                
+                # Check if normalization window should be applied
+                if self.include_norm_window.isChecked():
+                    # Apply user-defined trimming from normalization tab
+                    # Use correct window based on period
+                    if abs(period - 1.75) < 0.1:
+                        paddle_window = self.paddle_stroke_windows[1.75]
+                    elif abs(period - 2.25) < 0.1:
+                        paddle_window = self.paddle_stroke_windows[2.25]
+                    else:
+                        paddle_window = self.paddle_stroke_windows[1.75] if period < 2.0 else self.paddle_stroke_windows[2.25]
+                    
+                    start_time = paddle_window['start']
+                    end_time = paddle_window['end']
+                    mask_domain = (t_abs >= start_time) & (t_abs <= end_time)
+                    
+                    if not np.any(mask_domain):
+                        continue
+                    
+                    # Map trimmed paddle stroke data to [0.4, 1.0] range (last 60% of full period)
+                    t_abs_trimmed = t_abs[mask_domain]
+                    t = np.linspace(0.4, 1.0, len(t_abs_trimmed))  # Direct mapping to paddle stroke portion
+                else:
+                    # Use full trace without trimming
+                    print(f"DEBUG: Using full paddle stroke trace without normalization window")
+                    t = np.linspace(0.4, 1.0, len(t_abs))  # Map full trace to paddle stroke portion
+                    mask_domain = np.ones_like(t_abs, dtype=bool)  # No masking
                 if self.channel_var.currentText() == 'thrust':
-                    y = np.asarray(exp_data['thrust_mean'])
+                    y = np.asarray(exp_data['thrust_mean'])[mask_domain]
                     ystd_full = exp_data.get('thrust_std', None)
-                    ystd = np.asarray(ystd_full) if ystd_full is not None else None
+                    ystd = np.asarray(ystd_full)[mask_domain] if ystd_full is not None else None
                     label = f"T: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}"
                 else:
-                    y = np.asarray(exp_data['lift_mean'])
+                    y = np.asarray(exp_data['lift_mean'])[mask_domain]
                     ystd_full = exp_data.get('lift_std', None)
-                    ystd = np.asarray(ystd_full) if ystd_full is not None else None
+                    ystd = np.asarray(ystd_full)[mask_domain] if ystd_full is not None else None
                     label = f"L: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}"
                 
                 # Ensure t and y have the same length
@@ -1169,7 +1553,7 @@ class PaddleStrokeOverviewGUI(QMainWindow):
 
                 # Mean line with legend label control
                 plot_label = legend_label if legend_on and legend_label else '_nolegend_'
-                self.ax.plot(t[mask_domain], y, linewidth=max(0.5, lw), label=plot_label, color=color)
+                self.ax.plot(t, y, linewidth=max(0.5, lw), label=plot_label, color=color)
 
             if selections and self.legend_on_var.isChecked():
                 loc = self.legend_loc_var.currentText() if self.legend_loc_var.currentText() else 'best'
@@ -2699,28 +3083,51 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                     ysig = np.asarray(exp.get('lift_mean', []))
                 if t_abs.size == 0 or ysig.size == 0:
                     continue
-                # Use absolute time; consider peaks after a small initial region and within first 40% of stroke
-                min_time = 0.05
-                max_time = 0.4 * t_abs.max()  # First 40% of stroke duration
-                mask = (t_abs >= min_time) & (t_abs <= max_time)
+                
+                # For paddle stroke: normalize time to [0.4, 1.0] range (paddle portion of full stroke)
+                # Map absolute time to normalized time
+                period = m.get('period', 2.25)
+                if abs(period - 1.75) < 0.1:
+                    paddle_window = self.paddle_stroke_windows[1.75]
+                elif abs(period - 2.25) < 0.1:
+                    paddle_window = self.paddle_stroke_windows[2.25]
+                else:
+                    paddle_window = self.paddle_stroke_windows[1.75] if period < 2.0 else self.paddle_stroke_windows[2.25]
+                
+                start_time = paddle_window['start']
+                end_time = paddle_window['end']
+                
+                # Apply paddle stroke window mask
+                mask = (t_abs >= start_time) & (t_abs <= end_time)
                 if mask.sum() < 3:
                     continue
-                phase_seg = t_abs[mask]
-                y_seg = ysig[mask]
                 
-                # Simple peak detection: max for thrust, min for lift (within first 40% of stroke)
+                # Extract windowed data and map to normalized time [0.4, 1.0]
+                t_abs_windowed = t_abs[mask]
+                y_windowed = ysig[mask]
+                t_norm = np.linspace(0.4, 1.0, len(t_abs_windowed))
+                
+                # Only consider peaks before 0.8 of the full period (exclude last 20%)
+                peak_mask = t_norm < 0.8
+                if peak_mask.sum() < 3:
+                    continue
+                
+                t_norm_for_peak = t_norm[peak_mask]
+                y_for_peak = y_windowed[peak_mask]
+                
+                # Simple peak detection: max for thrust, min for lift (within paddle stroke window, before t=0.8)
                 pts = []
                 if channel == 'thrust':
                     # For thrust: find maximum (positive peak)
-                    max_idx = np.argmax(y_seg)
-                    peak_time = float(phase_seg[max_idx])
-                    peak_value = float(y_seg[max_idx])
+                    max_idx = np.argmax(y_for_peak)
+                    peak_time = float(t_norm_for_peak[max_idx])
+                    peak_value = float(y_for_peak[max_idx])
                     pts.append((peak_time, peak_value))
                 else:
                     # For lift: find minimum (negative peak)
-                    min_idx = np.argmin(y_seg)
-                    peak_time = float(phase_seg[min_idx])
-                    peak_value = float(y_seg[min_idx])
+                    min_idx = np.argmin(y_for_peak)
+                    peak_time = float(t_norm_for_peak[min_idx])
+                    peak_value = float(y_for_peak[min_idx])
                     pts.append((peak_time, peak_value))
 
                 if len(pts) == 0:
@@ -2846,12 +3253,24 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                 lift = np.asarray(exp.get('lift_mean', []))
                 if t_abs.size == 0 or thrust.size == 0 or lift.size == 0:
                     continue
-                t_norm = self._normalize_time_vector(t_abs)
-                mask = (t_norm >= 0.0) & (t_norm <= 1.0)
+                period = m['stroke_period']
+                # Apply user-defined trimming from normalization tab
+                # Use correct window based on period
+                if abs(period - 1.75) < 0.1:
+                    paddle_window = self.paddle_stroke_windows[1.75]
+                elif abs(period - 2.25) < 0.1:
+                    paddle_window = self.paddle_stroke_windows[2.25]
+                else:
+                    paddle_window = self.paddle_stroke_windows[1.75] if period < 2.0 else self.paddle_stroke_windows[2.25]
+                
+                start_time = paddle_window['start']
+                end_time = paddle_window['end']
+                mask = (t_abs >= start_time) & (t_abs <= end_time)
                 if not np.any(mask):
                     continue
-                mt = float(np.mean(thrust))
-                ml = float(np.mean(lift))
+                # Calculate means from user-trimmed data
+                mt = float(np.mean(thrust[mask]))
+                ml = float(np.mean(lift[mask]))
                 color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
                 # draw shaft with pronounced dashes, then draw a solid head only
                 line, = ax.plot([0, mt], [0, ml], color=color, linewidth=lw, alpha=0.95, solid_capstyle='round')
@@ -3285,38 +3704,53 @@ class PaddleStrokeOverviewGUI(QMainWindow):
             params = exp_data['parameters']
             
             # Extract parameters (adapt based on your actual parameter names)
+            period = params.get('period', params.get('stroke_period', 2.25))
             plot_data['twist'].append(params.get('twist', 0.0))
             plot_data['sweep'].append(params.get('sweep', 0.0))
             plot_data['flow_speed'].append(params.get('flow_speed', 0.0))
-            plot_data['stroke_period'].append(params.get('stroke_period', 0.0))
-            # No phase overlap for Power stroke data
+            plot_data['stroke_period'].append(period)
+            # No phase overlap for Paddle stroke data
             
             # Get mean traces
             thrust_trace = exp_data['thrust_mean']
             lift_trace = exp_data['lift_mean']
             time_vector = exp_data['time_vector']
             
-            # Normalize absolute time to fixed 0-1 combined stroke phase
-            time_norm = self._normalize_time_vector(time_vector)
+            # Get mask for paddle stroke portion (trimming artifacts)
+            window_mask = self._get_paddle_stroke_mask(time_vector, period)
+            if not np.any(window_mask):
+                continue
             
-            # Apply fixed domain
-            window_mask = (time_norm >= 0.0) & (time_norm <= 1.0)
+            # Apply mask to trim data, then normalize using full stroke reference
             thrust_windowed = thrust_trace[window_mask]
             lift_windowed = lift_trace[window_mask]
-            time_windowed = time_norm[window_mask]
+            time_trimmed = time_vector[window_mask]
+            time_windowed = np.linspace(0.4, 1.0, len(time_trimmed))  # Direct mapping to paddle stroke portion [0.4, 1.0]
             
             # Calculate mean forces within window
             plot_data['thrust_mean'].append(np.mean(thrust_windowed))
             plot_data['lift_mean'].append(np.mean(lift_windowed))
             
-            # Calculate peak locations and values within window
-            thrust_peak_idx = np.argmax(np.abs(thrust_windowed))
-            lift_peak_idx = np.argmax(np.abs(lift_windowed))
-            
-            plot_data['thrust_peak_location'].append(time_windowed[thrust_peak_idx])
-            plot_data['lift_peak_location'].append(time_windowed[lift_peak_idx])
-            plot_data['thrust_peak_value'].append(thrust_windowed[thrust_peak_idx])
-            plot_data['lift_peak_value'].append(lift_windowed[lift_peak_idx])
+            # Calculate peak locations and values within window (only before t=0.8)
+            # Only consider peaks before 0.8 of the full period
+            peak_mask = time_windowed < 0.8
+            if np.sum(peak_mask) > 0:
+                thrust_peak_idx = np.argmax(np.abs(thrust_windowed[peak_mask]))
+                lift_peak_idx = np.argmax(np.abs(lift_windowed[peak_mask]))
+                
+                plot_data['thrust_peak_location'].append(time_windowed[peak_mask][thrust_peak_idx])
+                plot_data['lift_peak_location'].append(time_windowed[peak_mask][lift_peak_idx])
+                plot_data['thrust_peak_value'].append(thrust_windowed[peak_mask][thrust_peak_idx])
+                plot_data['lift_peak_value'].append(lift_windowed[peak_mask][lift_peak_idx])
+            else:
+                # If no data before 0.8, use the overall peak (fallback)
+                thrust_peak_idx = np.argmax(np.abs(thrust_windowed))
+                lift_peak_idx = np.argmax(np.abs(lift_windowed))
+                
+                plot_data['thrust_peak_location'].append(time_windowed[thrust_peak_idx])
+                plot_data['lift_peak_location'].append(time_windowed[lift_peak_idx])
+                plot_data['thrust_peak_value'].append(thrust_windowed[thrust_peak_idx])
+                plot_data['lift_peak_value'].append(lift_windowed[lift_peak_idx])
                 
         # Convert to numpy arrays
         for key in plot_data.keys():

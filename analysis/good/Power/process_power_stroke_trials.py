@@ -37,7 +37,7 @@ class PowerStrokeTrialProcessor:
         self.output_path = output_hdf5_path
         
         # Processing parameters (matching GUI settings)
-        self.before_trial_include = 10  # samples
+        self.before_trial_include = {1.75: 4, 2.25: 5}  # samples per period
         self.low_threshold = 1.5
         self.high_threshold = 2.0
         self.min_gap_samples = 250  # 0.5 seconds at 500 Hz
@@ -45,13 +45,13 @@ class PowerStrokeTrialProcessor:
         
         # Period-based trial lengths
         self.trial_lengths = {
-            1.75: 150,
-            2.25: 175
+            1.75: 115,
+            2.25: 150
         }
         
         # Filtering parameters
         self.median_window = 11
-        self.lowpass_cutoff = 8.0
+        self.lowpass_cutoff = 9.0
         
     def load_data(self):
         """Load the input HDF5 data (same structure as GUI)"""
@@ -102,7 +102,7 @@ class PowerStrokeTrialProcessor:
         print(f"Parameters: {len(self.periods)} periods, {len(self.yaw_amplitudes)} yaw amplitudes, "
               f"{len(self.roll_angles)} roll angles, {len(self.flow_speeds)} flow speeds")
         
-    def apply_data_filters(self, data, median_window=11, fs=500, cf=4.0):
+    def apply_data_filters(self, data, median_window=11, fs=500, cf=9.0):
         """
         Apply filters to thrust and lift data (NOT Arduino) - same as GUI
         
@@ -216,9 +216,10 @@ class PowerStrokeTrialProcessor:
             
             # Get trial length for this period
             trial_length = self.trial_lengths.get(period, 150)  # Default to 150
+            before_trial = self.before_trial_include.get(period, 4)
             
             # Apply filters to the data
-            filtered_data = self.apply_data_filters(exp_data)
+            filtered_data = self.apply_data_filters(exp_data, cf=self.lowpass_cutoff)
             
             # Zero the data (subtract mean of first 100 samples)
             zeroed_data = filtered_data.copy()
@@ -237,7 +238,7 @@ class PowerStrokeTrialProcessor:
             trials = []
             for start in trial_starts:
                 # Adjust start with before trial include
-                adjusted_start = start - self.before_trial_include
+                adjusted_start = start - before_trial
                 adjusted_start = max(0, adjusted_start)
                 
                 # Calculate end

@@ -122,6 +122,16 @@ class FullStrokeOverviewGUI(QMainWindow):
             'overlap': set(),
         }
         self.dataset_rows = []
+        
+        # Normalization settings: define time windows for each period
+        # These define the actual useful data window for each period setting
+        # Verified settings based on trace analysis
+        self.norm_windows = {
+            1.75: {'start': 0.70, 'end': 1.75},  # 1.75s period: 1.05s duration
+            2.25: {'start': 0.90, 'end': 2.25}   # 2.25s period: 1.35s duration
+        }
+        self.stroke_split = 0.40  # 40% power stroke, 60% paddle stroke
+        
         self.init_ui()
         # Ensure data loads at startup
         self.auto_load_data()
@@ -232,6 +242,10 @@ class FullStrokeOverviewGUI(QMainWindow):
                     pass
                 try:
                     self.update_mean_force_parameter_controls()
+                except Exception:
+                    pass
+                try:
+                    self.populate_normalization_parameters()
                 except Exception:
                     pass
 
@@ -483,11 +497,42 @@ class FullStrokeOverviewGUI(QMainWindow):
             pass
         self.statusBar().showMessage(f"Published overview plots to {outdir}")
 
-    def _normalize_time_vector(self, time_vector: np.ndarray) -> np.ndarray:
-        """Normalize absolute time to the combined stroke phase [0, 1] using [0.75s, 2.25s]."""
+    def _normalize_time_vector(self, time_vector: np.ndarray, period: float) -> np.ndarray:
+        """
+        Normalize absolute time to [0, 1] using period-specific windows.
+        
+        Args:
+            time_vector: Absolute time values in seconds
+            period: Stroke period (1.75 or 2.25)
+            
+        Returns:
+            Normalized time in [0, 1] range
+        """
         t = np.asarray(time_vector, dtype=float)
-        # Map 0.75->0 and 2.25->1
-        t_norm = (t - 0.75) / 1.5
+        
+        # Get the appropriate window for this period
+        # Round period to nearest standard value to handle floating point issues
+        if abs(period - 1.75) < 0.1:
+            window = self.norm_windows[1.75]
+        elif abs(period - 2.25) < 0.1:
+            window = self.norm_windows[2.25]
+        else:
+            # Fallback: use closest period window
+            if period < 2.0:
+                window = self.norm_windows[1.75]
+            else:
+                window = self.norm_windows[2.25]
+        
+        start_time = window['start']
+        end_time = window['end']
+        duration = end_time - start_time
+        
+        # Normalize: map [start_time, end_time] to [0, 1]
+        if duration > 0:
+            t_norm = (t - start_time) / duration
+        else:
+            t_norm = t * 0.0  # Return zeros if duration is invalid
+            
         return t_norm
             
     def _seed_defaults(self):
@@ -798,13 +843,505 @@ class FullStrokeOverviewGUI(QMainWindow):
         self.tab_widget = QTabWidget()
         parent.addWidget(self.tab_widget)
         
-        # Create tabs
+        # Create tabs (normalization settings first!)
+        self.create_normalization_settings_tab()
         self.create_overview_settings_tab()
         self.create_traces_tab()
         self.create_mean_overview_tab()
         self.create_mean_force_tab()
         self.create_peak_location_tab()
         self.create_vector_tab()
+        
+    def create_normalization_settings_tab(self):
+        """Create the normalization settings tab for defining time windows"""
+        norm_widget = QWidget()
+        norm_layout = QHBoxLayout(norm_widget)
+        
+        # Left panel: Settings and controls
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(10, 10, 10, 10)
+        left_panel.setMaximumWidth(500)
+        
+        # Title and description
+        title_label = QLabel("Normalization Settings")
+        title_label.setFont(QFont("Arial", 14, QFont.Bold))
+        left_layout.addWidget(title_label)
+        
+        desc_label = QLabel(
+            "Define time windows containing useful data for each period.\n"
+            "Plot traces to visualize and adjust window boundaries."
+        )
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("color: #555; margin-bottom: 5px; font-size: 10px;")
+        left_layout.addWidget(desc_label)
+        
+        # Create settings frame
+        settings_frame = QGroupBox("Time Window Settings")
+        settings_layout = QVBoxLayout(settings_frame)
+        
+        # Period 1.75s settings
+        period_175_frame = QGroupBox("Period 1.75s")
+        period_175_layout = QGridLayout(period_175_frame)
+        
+        period_175_layout.addWidget(QLabel("Start Time (s):"), 0, 0)
+        self.norm_175_start = QDoubleSpinBox()
+        self.norm_175_start.setRange(0.0, 10.0)
+        self.norm_175_start.setSingleStep(0.05)
+        self.norm_175_start.setDecimals(2)
+        self.norm_175_start.setValue(self.norm_windows[1.75]['start'])
+        self.norm_175_start.valueChanged.connect(self.update_normalization_settings)
+        period_175_layout.addWidget(self.norm_175_start, 0, 1)
+        
+        period_175_layout.addWidget(QLabel("End Time (s):"), 0, 2)
+        self.norm_175_end = QDoubleSpinBox()
+        self.norm_175_end.setRange(0.0, 10.0)
+        self.norm_175_end.setSingleStep(0.05)
+        self.norm_175_end.setDecimals(2)
+        self.norm_175_end.setValue(self.norm_windows[1.75]['end'])
+        self.norm_175_end.valueChanged.connect(self.update_normalization_settings)
+        period_175_layout.addWidget(self.norm_175_end, 0, 3)
+        
+        period_175_layout.addWidget(QLabel("Duration:"), 0, 4)
+        self.norm_175_duration = QLabel()
+        self.norm_175_duration.setStyleSheet("font-weight: bold; color: #0078d4;")
+        period_175_layout.addWidget(self.norm_175_duration, 0, 5)
+        
+        settings_layout.addWidget(period_175_frame)
+        
+        # Period 2.25s settings
+        period_225_frame = QGroupBox("Period 2.25s")
+        period_225_layout = QGridLayout(period_225_frame)
+        
+        period_225_layout.addWidget(QLabel("Start Time (s):"), 0, 0)
+        self.norm_225_start = QDoubleSpinBox()
+        self.norm_225_start.setRange(0.0, 10.0)
+        self.norm_225_start.setSingleStep(0.05)
+        self.norm_225_start.setDecimals(2)
+        self.norm_225_start.setValue(self.norm_windows[2.25]['start'])
+        self.norm_225_start.valueChanged.connect(self.update_normalization_settings)
+        period_225_layout.addWidget(self.norm_225_start, 0, 1)
+        
+        period_225_layout.addWidget(QLabel("End Time (s):"), 0, 2)
+        self.norm_225_end = QDoubleSpinBox()
+        self.norm_225_end.setRange(0.0, 10.0)
+        self.norm_225_end.setSingleStep(0.05)
+        self.norm_225_end.setDecimals(2)
+        self.norm_225_end.setValue(self.norm_windows[2.25]['end'])
+        self.norm_225_end.valueChanged.connect(self.update_normalization_settings)
+        period_225_layout.addWidget(self.norm_225_end, 0, 3)
+        
+        period_225_layout.addWidget(QLabel("Duration:"), 0, 4)
+        self.norm_225_duration = QLabel()
+        self.norm_225_duration.setStyleSheet("font-weight: bold; color: #0078d4;")
+        period_225_layout.addWidget(self.norm_225_duration, 0, 5)
+        
+        settings_layout.addWidget(period_225_frame)
+        
+        # Stroke split settings
+        split_frame = QGroupBox("Stroke Phase Split")
+        split_layout = QGridLayout(split_frame)
+        
+        split_layout.addWidget(QLabel("Power Stroke (% of normalized window):"), 0, 0)
+        self.stroke_split_spinbox = QDoubleSpinBox()
+        self.stroke_split_spinbox.setRange(0.0, 100.0)
+        self.stroke_split_spinbox.setSingleStep(1.0)
+        self.stroke_split_spinbox.setDecimals(1)
+        self.stroke_split_spinbox.setValue(self.stroke_split * 100)
+        self.stroke_split_spinbox.setSuffix(" %")
+        self.stroke_split_spinbox.valueChanged.connect(self.update_normalization_settings)
+        split_layout.addWidget(self.stroke_split_spinbox, 0, 1)
+        
+        split_layout.addWidget(QLabel("Paddle Stroke:"), 0, 2)
+        self.paddle_split_label = QLabel()
+        self.paddle_split_label.setStyleSheet("font-weight: bold; color: #0078d4;")
+        split_layout.addWidget(self.paddle_split_label, 0, 3)
+        
+        split_info = QLabel(
+            "Note: This split applies to the NORMALIZED [0,1] window.\n"
+            "Power stroke occupies [0, split%], Paddle stroke occupies [split%, 1.0]"
+        )
+        split_info.setWordWrap(True)
+        split_info.setStyleSheet("color: #666; font-size: 10px; margin-top: 5px;")
+        split_layout.addWidget(split_info, 1, 0, 1, 4)
+        
+        settings_layout.addWidget(split_frame)
+        left_layout.addWidget(settings_frame)
+        
+        # Trace selection controls
+        trace_sel_frame = QGroupBox("Trace Selection for Visualization")
+        trace_sel_layout = QVBoxLayout(trace_sel_frame)
+        
+        # Channel selection
+        chan_layout = QHBoxLayout()
+        chan_layout.addWidget(QLabel("Channel:"))
+        self.norm_channel = QComboBox()
+        self.norm_channel.addItems(["thrust", "lift"])
+        chan_layout.addWidget(self.norm_channel)
+        chan_layout.addStretch()
+        trace_sel_layout.addLayout(chan_layout)
+        
+        # Parameter filters
+        param_layout = QGridLayout()
+        param_layout.addWidget(QLabel("Flow:"), 0, 0)
+        self.norm_flow = QComboBox()
+        param_layout.addWidget(self.norm_flow, 0, 1)
+        
+        param_layout.addWidget(QLabel("Period:"), 1, 0)
+        self.norm_period = QComboBox()
+        param_layout.addWidget(self.norm_period, 1, 1)
+        
+        param_layout.addWidget(QLabel("Sweep:"), 2, 0)
+        self.norm_sweep = QComboBox()
+        param_layout.addWidget(self.norm_sweep, 2, 1)
+        
+        param_layout.addWidget(QLabel("Twist:"), 3, 0)
+        self.norm_twist = QComboBox()
+        param_layout.addWidget(self.norm_twist, 3, 1)
+        
+        param_layout.addWidget(QLabel("Overlap:"), 4, 0)
+        self.norm_overlap = QComboBox()
+        param_layout.addWidget(self.norm_overlap, 4, 1)
+        
+        trace_sel_layout.addLayout(param_layout)
+        
+        # Plot button
+        plot_norm_button = QPushButton("Plot Traces (Absolute Time)")
+        plot_norm_button.setStyleSheet("QPushButton { background-color: #28a745; color: white; font-weight: bold; padding: 8px; }")
+        plot_norm_button.clicked.connect(self.plot_normalization_traces)
+        trace_sel_layout.addWidget(plot_norm_button)
+        
+        left_layout.addWidget(trace_sel_frame)
+        
+        # Preview section
+        preview_frame = QGroupBox("Current Settings Summary")
+        preview_layout = QVBoxLayout(preview_frame)
+        
+        self.norm_summary_text = QTextEdit()
+        self.norm_summary_text.setReadOnly(True)
+        self.norm_summary_text.setMaximumHeight(120)
+        self.norm_summary_text.setStyleSheet("background-color: #f0f0f0; font-family: 'Courier New'; font-size: 9px;")
+        preview_layout.addWidget(self.norm_summary_text)
+        
+        left_layout.addWidget(preview_frame)
+        
+        # Apply button
+        apply_button = QPushButton("Apply Settings & Refresh Plot")
+        apply_button.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; padding: 8px; }")
+        apply_button.clicked.connect(self.apply_normalization_settings)
+        left_layout.addWidget(apply_button)
+        
+        # Save/Load buttons
+        button_layout = QHBoxLayout()
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(self.save_normalization_settings)
+        button_layout.addWidget(save_button)
+        
+        load_button = QPushButton("Load")
+        load_button.clicked.connect(self.load_normalization_settings)
+        button_layout.addWidget(load_button)
+        
+        reset_button = QPushButton("Reset")
+        reset_button.clicked.connect(self.reset_normalization_settings)
+        button_layout.addWidget(reset_button)
+        
+        left_layout.addLayout(button_layout)
+        
+        left_layout.addStretch()
+        
+        # Right panel: Plot area
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(5, 5, 5, 5)
+        
+        plot_title = QLabel("Trace Visualization (Absolute Time)")
+        plot_title.setFont(QFont("Arial", 12, QFont.Bold))
+        right_layout.addWidget(plot_title)
+        
+        # Matplotlib figure for normalization traces
+        self.norm_figure = Figure(figsize=(10, 6), dpi=100)
+        self.norm_ax = self.norm_figure.add_subplot(111)
+        self.norm_ax.grid(True, alpha=0.3)
+        self.norm_ax.set_xlabel('Absolute Time (seconds)', fontsize=11)
+        self.norm_ax.set_ylabel('Force (scaled)', fontsize=11)
+        self.norm_canvas = FigureCanvas(self.norm_figure)
+        right_layout.addWidget(self.norm_canvas)
+        
+        # Add panels to main layout
+        norm_layout.addWidget(left_panel)
+        norm_layout.addWidget(right_panel)
+        
+        self.tab_widget.addTab(norm_widget, "Normalization")
+        
+        # Initialize display
+        self.update_normalization_display()
+        self.populate_normalization_parameters()
+        
+    def populate_normalization_parameters(self):
+        """Populate parameter dropdowns for normalization trace selection"""
+        if not self.param_index:
+            return
+            
+        # Populate flow
+        flow_values = ['All'] + [str(v) for v in sorted(self.param_index.get('flow', []))]
+        self.norm_flow.clear()
+        self.norm_flow.addItems(flow_values)
+        
+        # Populate period
+        period_values = ['All'] + [f"{v:.2f}" if abs(v - round(v)) > 1e-6 else str(int(v)) 
+                                     for v in sorted(self.param_index.get('period', []))]
+        self.norm_period.clear()
+        self.norm_period.addItems(period_values)
+        
+        # Populate sweep
+        sweep_values = ['All'] + [str(int(v)) for v in sorted(self.param_index.get('sweep', []))]
+        self.norm_sweep.clear()
+        self.norm_sweep.addItems(sweep_values)
+        
+        # Populate twist
+        twist_values = ['All'] + [str(int(v)) for v in sorted(self.param_index.get('twist', []))]
+        self.norm_twist.clear()
+        self.norm_twist.addItems(twist_values)
+        
+        # Populate overlap
+        overlap_values = ['All'] + [f"{v:.2f}" for v in sorted(self.param_index.get('overlap', []))]
+        self.norm_overlap.clear()
+        self.norm_overlap.addItems(overlap_values)
+        
+    def plot_normalization_traces(self):
+        """Plot traces with absolute time to visualize normalization windows"""
+        if not self.data or 'experiments' not in self.data:
+            QMessageBox.warning(self, "No Data", "Please load data first")
+            return
+            
+        # Clear the plot
+        self.norm_ax.clear()
+        self.norm_ax.grid(True, alpha=0.3)
+        
+        # Get filter criteria
+        channel = self.norm_channel.currentText()
+        flow_filter = self.norm_flow.currentText()
+        period_filter = self.norm_period.currentText()
+        sweep_filter = self.norm_sweep.currentText()
+        twist_filter = self.norm_twist.currentText()
+        overlap_filter = self.norm_overlap.currentText()
+        
+        # Filter experiments
+        plotted_count = 0
+        colors = plt.cm.tab10(np.linspace(0, 1, 10))
+        
+        for exp_key, exp_data in self.data['experiments'].items():
+            params = exp_data['parameters']
+            m = self._param_map(params)
+            
+            # Apply filters
+            if flow_filter != 'All' and abs(m['flow'] - float(flow_filter)) > 1e-6:
+                continue
+            if period_filter != 'All' and abs(m['stroke_period'] - float(period_filter)) > 1e-6:
+                continue
+            if sweep_filter != 'All' and abs(m['sweep'] - float(sweep_filter)) > 1e-6:
+                continue
+            if twist_filter != 'All' and abs(m['twist'] - float(twist_filter)) > 1e-6:
+                continue
+            if overlap_filter != 'All' and abs(m['overlap'] - float(overlap_filter)) > 1e-6:
+                continue
+                
+            # Get trace data
+            t_abs = np.asarray(exp_data['time_vector'])
+            if channel == 'thrust':
+                force = np.asarray(exp_data['thrust_mean'])
+            else:
+                force = np.asarray(exp_data['lift_mean'])
+                
+            if len(t_abs) == 0 or len(force) == 0:
+                continue
+                
+            # Plot trace with absolute time
+            color = colors[plotted_count % len(colors)]
+            label = f"F={m['flow']}, P={m['stroke_period']}, S={int(m['sweep'])}, T={int(m['twist'])}, O={m['overlap']:.2f}"
+            self.norm_ax.plot(t_abs, force, linewidth=1.5, alpha=0.7, color=color, label=label)
+            plotted_count += 1
+            
+            # Only plot first 5 to avoid clutter
+            if plotted_count >= 5:
+                break
+        
+        if plotted_count == 0:
+            self.norm_ax.text(0.5, 0.5, 'No traces match the selected criteria', 
+                            transform=self.norm_ax.transAxes, ha='center', va='center',
+                            fontsize=12, color='gray')
+        else:
+            # Add vertical lines showing normalization windows
+            # Determine which period is being viewed
+            if period_filter != 'All':
+                period = float(period_filter)
+                if abs(period - 1.75) < 0.1:
+                    window = self.norm_windows[1.75]
+                    color = 'red'
+                    label_text = f"1.75s window"
+                elif abs(period - 2.25) < 0.1:
+                    window = self.norm_windows[2.25]
+                    color = 'blue'
+                    label_text = f"2.25s window"
+                else:
+                    window = None
+                    
+                if window:
+                    self.norm_ax.axvline(x=window['start'], color=color, linestyle='--', 
+                                        linewidth=2, label=f"{label_text} start ({window['start']:.2f}s)")
+                    self.norm_ax.axvline(x=window['end'], color=color, linestyle='--', 
+                                        linewidth=2, label=f"{label_text} end ({window['end']:.2f}s)")
+                    # Shade the window region
+                    y_min, y_max = self.norm_ax.get_ylim()
+                    self.norm_ax.axvspan(window['start'], window['end'], 
+                                        alpha=0.1, color=color, label=f"{label_text} active region")
+            else:
+                # Show both windows if no specific period selected
+                win_175 = self.norm_windows[1.75]
+                win_225 = self.norm_windows[2.25]
+                self.norm_ax.axvline(x=win_175['start'], color='red', linestyle='--', 
+                                    linewidth=2, label=f"1.75s start ({win_175['start']:.2f}s)")
+                self.norm_ax.axvline(x=win_175['end'], color='red', linestyle='--', 
+                                    linewidth=2, label=f"1.75s end ({win_175['end']:.2f}s)")
+                self.norm_ax.axvline(x=win_225['start'], color='blue', linestyle='--', 
+                                    linewidth=2, label=f"2.25s start ({win_225['start']:.2f}s)")
+                self.norm_ax.axvline(x=win_225['end'], color='blue', linestyle='--', 
+                                    linewidth=2, label=f"2.25s end ({win_225['end']:.2f}s)")
+            
+            # Add legend
+            self.norm_ax.legend(loc='best', fontsize=8, ncol=2)
+            
+        self.norm_ax.set_xlabel('Absolute Time (seconds)', fontsize=11)
+        self.norm_ax.set_ylabel(f'{channel.capitalize()} Force (scaled)', fontsize=11)
+        self.norm_ax.set_title(f'Trace Visualization for Normalization Window Selection', fontsize=12, fontweight='bold')
+        
+        self.norm_canvas.draw()
+        self.statusBar().showMessage(f"Plotted {plotted_count} trace(s) with normalization windows")
+        
+    def update_normalization_settings(self):
+        """Update normalization settings from UI controls"""
+        self.norm_windows[1.75]['start'] = self.norm_175_start.value()
+        self.norm_windows[1.75]['end'] = self.norm_175_end.value()
+        self.norm_windows[2.25]['start'] = self.norm_225_start.value()
+        self.norm_windows[2.25]['end'] = self.norm_225_end.value()
+        self.stroke_split = self.stroke_split_spinbox.value() / 100.0
+        
+        self.update_normalization_display()
+        
+    def update_normalization_display(self):
+        """Update the display of normalization settings"""
+        # Update duration labels
+        dur_175 = self.norm_windows[1.75]['end'] - self.norm_windows[1.75]['start']
+        dur_225 = self.norm_windows[2.25]['end'] - self.norm_windows[2.25]['start']
+        self.norm_175_duration.setText(f"{dur_175:.2f} s")
+        self.norm_225_duration.setText(f"{dur_225:.2f} s")
+        
+        # Update paddle split label
+        paddle_pct = (1.0 - self.stroke_split) * 100
+        self.paddle_split_label.setText(f"{paddle_pct:.1f} %")
+        
+        # Update summary text
+        summary = f"""
+NORMALIZATION SETTINGS FOR FULL STROKE
+========================================
+
+Period 1.75s Window:
+  Start Time:    {self.norm_windows[1.75]['start']:.2f} s
+  End Time:      {self.norm_windows[1.75]['end']:.2f} s
+  Duration:      {dur_175:.2f} s
+  
+Period 2.25s Window:
+  Start Time:    {self.norm_windows[2.25]['start']:.2f} s
+  End Time:      {self.norm_windows[2.25]['end']:.2f} s
+  Duration:      {dur_225:.2f} s
+
+Stroke Phase Split:
+  Power Stroke:  {self.stroke_split * 100:.1f}% of normalized window [0, {self.stroke_split:.2f}]
+  Paddle Stroke: {paddle_pct:.1f}% of normalized window [{self.stroke_split:.2f}, 1.0]
+
+Note: All trace data will be normalized to [0, 1] based on these windows.
+The normalization formula: t_norm = (t_abs - start) / (end - start)
+"""
+        self.norm_summary_text.setPlainText(summary)
+        
+    def apply_normalization_settings(self):
+        """Apply normalization settings and refresh all plots"""
+        self.update_normalization_settings()
+        # Refresh the normalization plot to show updated windows
+        self.plot_normalization_traces()
+        self.statusBar().showMessage("Normalization settings applied - plot refreshed")
+        
+    def save_normalization_settings(self):
+        """Save normalization settings to a JSON file"""
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Save Normalization Settings", 
+            f"normalization_settings_fullstroke_{datetime.now().strftime('%Y%m%d')}.json",
+            "JSON files (*.json)"
+        )
+        
+        if filepath:
+            settings = {
+                'norm_windows': self.norm_windows,
+                'stroke_split': self.stroke_split,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            with open(filepath, 'w') as f:
+                json.dump(settings, f, indent=2)
+            
+            QMessageBox.information(self, "Saved", f"Settings saved to:\n{filepath}")
+            self.statusBar().showMessage(f"Settings saved to {filepath}")
+            
+    def load_normalization_settings(self):
+        """Load normalization settings from a JSON file"""
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Load Normalization Settings", "",
+            "JSON files (*.json)"
+        )
+        
+        if filepath:
+            try:
+                with open(filepath, 'r') as f:
+                    settings = json.load(f)
+                
+                # Update internal settings
+                self.norm_windows = settings['norm_windows']
+                self.stroke_split = settings['stroke_split']
+                
+                # Update UI controls
+                self.norm_175_start.setValue(self.norm_windows[1.75]['start'])
+                self.norm_175_end.setValue(self.norm_windows[1.75]['end'])
+                self.norm_225_start.setValue(self.norm_windows[2.25]['start'])
+                self.norm_225_end.setValue(self.norm_windows[2.25]['end'])
+                self.stroke_split_spinbox.setValue(self.stroke_split * 100)
+                
+                self.update_normalization_display()
+                
+                QMessageBox.information(self, "Loaded", f"Settings loaded from:\n{filepath}")
+                self.statusBar().showMessage(f"Settings loaded from {filepath}")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load settings:\n{str(e)}")
+                
+    def reset_normalization_settings(self):
+        """Reset normalization settings to verified defaults"""
+        self.norm_windows = {
+            1.75: {'start': 0.70, 'end': 1.75},  # 1.75s period: 1.05s duration
+            2.25: {'start': 0.90, 'end': 2.25}   # 2.25s period: 1.35s duration
+        }
+        self.stroke_split = 0.40  # 40% power stroke, 60% paddle stroke
+        
+        # Update UI controls
+        self.norm_175_start.setValue(self.norm_windows[1.75]['start'])
+        self.norm_175_end.setValue(self.norm_windows[1.75]['end'])
+        self.norm_225_start.setValue(self.norm_windows[2.25]['start'])
+        self.norm_225_end.setValue(self.norm_windows[2.25]['end'])
+        self.stroke_split_spinbox.setValue(self.stroke_split * 100)
+        
+        self.update_normalization_display()
+        
+        QMessageBox.information(self, "Reset", "Settings have been reset to defaults")
+        self.statusBar().showMessage("Settings reset to defaults")
         
     def create_traces_tab(self):
         """Create the traces tab with EXACT original GUI structure"""
@@ -962,6 +1499,18 @@ class FullStrokeOverviewGUI(QMainWindow):
         pub_layout.addWidget(pub_button, 0, 4, 2, 1)
         
         ctrl_layout.addWidget(pub_frame)
+        
+        # Normalization toggle
+        norm_toggle_frame = QGroupBox("Normalization Control")
+        norm_toggle_layout = QHBoxLayout(norm_toggle_frame)
+        
+        self.include_norm_window = QCheckBox("Include Normalization Window")
+        self.include_norm_window.setChecked(True)  # Default to enabled
+        self.include_norm_window.setToolTip("When checked, applies user-defined trimming from Normalization tab. When unchecked, plots full traces.")
+        norm_toggle_layout.addWidget(self.include_norm_window)
+        norm_toggle_layout.addStretch()
+        
+        ctrl_layout.addWidget(norm_toggle_frame)
         
         # Plot button (EXACT copy)
         self.plot_button = QPushButton("Plot")
@@ -1122,13 +1671,21 @@ class FullStrokeOverviewGUI(QMainWindow):
                     continue
                     
                 exp_data = self.data['experiments'][exp_key]
-                # Normalize absolute time to [0,1] based on [0.75, 2.25]
                 t_abs = np.asarray(exp_data['time_vector'])
-                t = self._normalize_time_vector(t_abs)
-                # Clip to [0,1] domain
-                mask_domain = (t >= 0.0) & (t <= 1.0)
-                if not np.any(mask_domain):
-                    continue
+                
+                # Check if normalization window should be applied
+                if self.include_norm_window.isChecked():
+                    # Normalize absolute time using period-specific window
+                    t = self._normalize_time_vector(t_abs, period)
+                    # Clip to [0,1] domain
+                    mask_domain = (t >= 0.0) & (t <= 1.0)
+                    if not np.any(mask_domain):
+                        continue
+                else:
+                    # Use full trace without normalization
+                    print(f"DEBUG: Using full trace without normalization window")
+                    t = np.linspace(0.0, 1.0, len(t_abs))  # Map full trace to [0,1] range
+                    mask_domain = np.ones_like(t_abs, dtype=bool)  # No masking
                 if self.channel_var.currentText() == 'thrust':
                     y = np.asarray(exp_data['thrust_mean'])[mask_domain]
                     ystd_full = exp_data.get('thrust_std', None)
@@ -1201,7 +1758,7 @@ class FullStrokeOverviewGUI(QMainWindow):
 
                 # Variance shading (mean ± std)
                 if include_var and ystd is not None:
-                    self.ax.fill_between(t, y - ystd, y + ystd, color=color, alpha=max(0.0, min(alpha, 1.0)), linewidth=0)
+                    self.ax.fill_between(t[mask_domain], y - ystd, y + ystd, color=color, alpha=max(0.0, min(alpha, 1.0)), linewidth=0)
 
                 # Mean line with legend label control
                 plot_label = legend_label if legend_on and legend_label else '_nolegend_'
@@ -2245,6 +2802,9 @@ class FullStrokeOverviewGUI(QMainWindow):
                 exp_data = self.data['experiments'][exp_key]
                 params = exp_data['parameters']
                 
+                # Get period for normalization
+                period = params.get('period', params.get('stroke_period', 2.25))
+                
                 # Get twist (roll angle) value
                 twist = abs(params.get('roll_angle', 0))
                 
@@ -2258,9 +2818,9 @@ class FullStrokeOverviewGUI(QMainWindow):
                 if len(time_vector) == 0 or len(force_data) == 0:
                     continue
                 
-                # Fixed normalization and mask
+                # Period-aware normalization and mask
                 time_array = np.asarray(time_vector)
-                t_norm = self._normalize_time_vector(time_array)
+                t_norm = self._normalize_time_vector(time_array, period)
                 mask = (t_norm >= 0.0) & (t_norm <= 1.0)
                 if not np.any(mask):
                     continue
@@ -2384,9 +2944,13 @@ class FullStrokeOverviewGUI(QMainWindow):
                 
                 time_vector = exp_data.get('time_vector', [])
                 
+                # Get experiment parameters first
+                params = exp_data.get('parameters', {})
+                period = params.get('period', params.get('stroke_period', 2.25))
+                
                 if len(trace) > 0 and len(time_vector) > 0:
-                    # Apply fixed normalization domain 0..1
-                    t_norm = self._normalize_time_vector(np.asarray(time_vector))
+                    # Apply period-aware normalization domain 0..1
+                    t_norm = self._normalize_time_vector(np.asarray(time_vector), period)
                     mask = (t_norm >= 0.0) & (t_norm <= 1.0)
                     windowed_trace = np.asarray(trace)[mask]
                     windowed_time = t_norm[mask]
@@ -2394,11 +2958,8 @@ class FullStrokeOverviewGUI(QMainWindow):
                     # Compute arithmetic mean over the phase window
                     mean_force = float(np.mean(windowed_trace)) if len(windowed_trace) > 0 else np.nan
 
-                    # Get experiment parameters
-                    params = exp_data.get('parameters', {})
                     roll_angle = abs(params.get('roll_angle', 0))  # Absolute value for x-axis
                     flow = params.get('flow', 0)
-                    period = params.get('period', 0)
 
                     # Store data
                     roll_angles.append(roll_angle)
@@ -2483,6 +3044,9 @@ class FullStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp_data = self.data['experiments'][exp_key]
                 params = exp_data['parameters']
+                
+                # Get period for normalization
+                period = params.get('period', params.get('stroke_period', 2.25))
                 twist = abs(params.get('roll_angle', 0))
                 
                 time_vector = exp_data.get('time_vector', [])
@@ -2493,10 +3057,10 @@ class FullStrokeOverviewGUI(QMainWindow):
                 if len(time_vector) == 0 or len(force_data) == 0:
                     continue
                 
-                # Normalize phase 0..1 and compute arithmetic mean within phase window
+                # Period-aware normalization and compute arithmetic mean within phase window
                 time_array = np.asarray(time_vector)
                 force_array = np.asarray(force_data)
-                t_norm = self._normalize_time_vector(time_array)
+                t_norm = self._normalize_time_vector(time_array, period)
                 mask = (t_norm >= 0.0) & (t_norm <= 1.0)
                 if not np.any(mask):
                     continue
@@ -2705,6 +3269,10 @@ class FullStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
+                
+                # Get period for normalization
+                period = m['stroke_period']
+                
                 t_abs = np.asarray(exp.get('time_vector', []))
                 if channel == 'thrust':
                     ysig = np.asarray(exp.get('thrust_mean', []))
@@ -2712,7 +3280,7 @@ class FullStrokeOverviewGUI(QMainWindow):
                     ysig = np.asarray(exp.get('lift_mean', []))
                 if t_abs.size == 0 or ysig.size == 0:
                     continue
-                t_norm = self._normalize_time_vector(t_abs)
+                t_norm = self._normalize_time_vector(t_abs, period)
                 # Consider peaks after 20% of cycle to capture early positive lift peaks
                 min_phase = 0.20
                 mask = (t_norm >= min_phase) & (t_norm <= 1.0)
@@ -2870,12 +3438,16 @@ class FullStrokeOverviewGUI(QMainWindow):
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
+                
+                # Get period for normalization
+                period = m['stroke_period']
+                
                 t_abs = np.asarray(exp.get('time_vector', []))
                 thrust = np.asarray(exp.get('thrust_mean', []))
                 lift = np.asarray(exp.get('lift_mean', []))
                 if t_abs.size == 0 or thrust.size == 0 or lift.size == 0:
                     continue
-                t_norm = self._normalize_time_vector(t_abs)
+                t_norm = self._normalize_time_vector(t_abs, period)
                 mask = (t_norm >= 0.0) & (t_norm <= 1.0)
                 if not np.any(mask):
                     continue
@@ -3026,21 +3598,21 @@ class FullStrokeOverviewGUI(QMainWindow):
                 if exp_key is None:
                     continue
                     
-                selections.append((exp_key, row))
+                selections.append((exp_key, row, period))
             
             if not selections:
                 QMessageBox.warning(self, "No Selection", "No valid experiments selected")
                 return
             
             # Plot each selection
-            for exp_key, row in selections:
+            for exp_key, row, period in selections:
                 if exp_key not in self.data['experiments']:
                     continue
                     
                 exp_data = self.data['experiments'][exp_key]
-                # Normalize and clip time to [0,1]
+                # Normalize and clip time using period-specific window
                 t_abs = np.asarray(exp_data['time_vector'])
-                t = self._normalize_time_vector(t_abs)
+                t = self._normalize_time_vector(t_abs, period)
                 mask_domain = (t >= 0.0) & (t <= 1.0)
                 if not np.any(mask_domain):
                     continue
@@ -3332,10 +3904,11 @@ class FullStrokeOverviewGUI(QMainWindow):
             params = exp_data['parameters']
             
             # Extract parameters (adapt based on your actual parameter names)
+            period = params.get('period', params.get('stroke_period', 2.25))
             plot_data['twist'].append(params.get('twist', 0.0))
             plot_data['sweep'].append(params.get('sweep', 0.0))
             plot_data['flow_speed'].append(params.get('flow_speed', 0.0))
-            plot_data['stroke_period'].append(params.get('stroke_period', 0.0))
+            plot_data['stroke_period'].append(period)
             plot_data['phase_overlap'].append(params.get('phase_overlap', 0.0))
             
             # Get mean traces
@@ -3343,8 +3916,8 @@ class FullStrokeOverviewGUI(QMainWindow):
             lift_trace = exp_data['lift_mean']
             time_vector = exp_data['time_vector']
             
-            # Normalize absolute time to fixed 0-1 combined stroke phase
-            time_norm = self._normalize_time_vector(time_vector)
+            # Normalize absolute time using period-specific window
+            time_norm = self._normalize_time_vector(time_vector, period)
             
             # Apply fixed domain
             window_mask = (time_norm >= 0.0) & (time_norm <= 1.0)

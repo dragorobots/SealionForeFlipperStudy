@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Power-Stroke Overview Metrics GUI
 
@@ -118,6 +118,29 @@ class PowerStrokeOverviewGUI(QMainWindow):
             'overlap': set(),
         }
         self.dataset_rows = []
+        
+        # Baseline parameters (default values)
+        self.baseline_params = {
+            'twist': 45.0,
+            'sweep': 80.0,
+            'period': 2.25,
+            'flow': 0.1,
+            'overlap': 0.5  # Not used in Power stroke, but kept for consistency
+        }
+        self.baseline_color = '#FF0000'  # Red for baseline
+        self.baseline_line_style = '--'  # Dashed line for baseline
+        
+        # Custom twist color overrides (empty initially, user can set)
+        self.custom_twist_colors = {}
+        
+        # Power stroke trimming windows (in absolute time coordinates)
+        # These define where valid power stroke data exists (trimming artifacts at edges)
+        # Power stroke data starts at t=0 in its own coordinate system
+        self.power_stroke_windows = {
+            1.75: {'start': 0.0, 'end': 0.23},  # 115 samples @ 500 Hz = 0.23s
+            2.25: {'start': 0.0, 'end': 0.30}   # 150 samples @ 500 Hz = 0.30s
+        }
+        
         self.init_ui()
         # Ensure data loads at startup
         self.auto_load_data()
@@ -293,7 +316,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
 
     def _build_twist_color_map(self):
         """Create a categorical color map for twist values (consistent across app)."""
-        twists = self.param_index.get('twist', [])
+        twists = sorted(self.param_index.get('twist', []))  # Sort to ensure consistent ordering
         choice = getattr(self, 'overview_palette_choice', 'Default')
         if choice == 'Custom' and hasattr(self, 'overview_custom_colors') and self.overview_custom_colors:
             palette = list(self.overview_custom_colors)
@@ -301,7 +324,17 @@ class PowerStrokeOverviewGUI(QMainWindow):
             palette = ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
         else:
             palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-        return {tw: palette[idx % len(palette)] for idx, tw in enumerate(twists)}
+        
+        # Build color map from palette
+        color_map = {tw: palette[idx % len(palette)] for idx, tw in enumerate(twists)}
+        
+        # Override with custom twist colors if set
+        if hasattr(self, 'custom_twist_colors'):
+            for twist, color in self.custom_twist_colors.items():
+                if twist in color_map and color:
+                    color_map[twist] = color
+        
+        return color_map
 
     def create_overview_settings_tab(self):
         tab = QWidget()
@@ -332,6 +365,91 @@ class PowerStrokeOverviewGUI(QMainWindow):
         palette_layout.addWidget(apply_btn, 3, 5)
         layout.addWidget(palette_group)
 
+        # Baseline parameters group
+        baseline_group = QGroupBox("Baseline Experimental Parameters")
+        baseline_layout = QGridLayout(baseline_group)
+        
+        baseline_layout.addWidget(QLabel("Twist (deg):"), 0, 0)
+        self.baseline_twist = QDoubleSpinBox()
+        self.baseline_twist.setRange(0, 90)
+        self.baseline_twist.setValue(self.baseline_params['twist'])
+        self.baseline_twist.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_twist, 0, 1)
+        
+        baseline_layout.addWidget(QLabel("Sweep (deg):"), 0, 2)
+        self.baseline_sweep = QDoubleSpinBox()
+        self.baseline_sweep.setRange(0, 100)
+        self.baseline_sweep.setValue(self.baseline_params['sweep'])
+        self.baseline_sweep.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_sweep, 0, 3)
+        
+        baseline_layout.addWidget(QLabel("Period (s):"), 1, 0)
+        self.baseline_period = QDoubleSpinBox()
+        self.baseline_period.setRange(0, 5)
+        self.baseline_period.setSingleStep(0.25)
+        self.baseline_period.setValue(self.baseline_params['period'])
+        self.baseline_period.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_period, 1, 1)
+        
+        baseline_layout.addWidget(QLabel("Flow (m/s):"), 1, 2)
+        self.baseline_flow = QDoubleSpinBox()
+        self.baseline_flow.setRange(0, 1)
+        self.baseline_flow.setSingleStep(0.05)
+        self.baseline_flow.setValue(self.baseline_params['flow'])
+        self.baseline_flow.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_flow, 1, 3)
+        
+        baseline_layout.addWidget(QLabel("Baseline Color:"), 2, 0)
+        self.baseline_color_edit = QLineEdit(self.baseline_color)
+        self.baseline_color_edit.setMaximumWidth(100)
+        self.baseline_color_edit.textChanged.connect(self._update_baseline_color)
+        baseline_layout.addWidget(self.baseline_color_edit, 2, 1)
+        
+        baseline_layout.addWidget(QLabel("Line Style:"), 2, 2)
+        self.baseline_linestyle = QComboBox()
+        self.baseline_linestyle.addItems(['-', '--', '-.', ':', 'None'])
+        self.baseline_linestyle.setCurrentText('--')
+        self.baseline_linestyle.currentTextChanged.connect(self._update_baseline_linestyle)
+        baseline_layout.addWidget(self.baseline_linestyle, 2, 3)
+        
+        baseline_info = QLabel("Note: Baseline traces will be plotted in the baseline color and line style, overriding the GUI's color scheme.")
+        baseline_info.setWordWrap(True)
+        baseline_layout.addWidget(baseline_info, 3, 0, 1, 4)
+        
+        layout.addWidget(baseline_group)
+        
+        # Twist color mapping controls
+        twist_color_group = QGroupBox("Twist Color Mapping (Override Palette)")
+        twist_color_layout = QGridLayout(twist_color_group)
+        
+        twist_color_layout.addWidget(QLabel("Twist (°)"), 0, 0)
+        twist_color_layout.addWidget(QLabel("Color (#RRGGBB)"), 0, 1)
+        
+        self.twist_color_edits = {}
+        # Common twist values - will be populated when data is loaded
+        common_twists = [0, 15, 30, 45, 60, 75, 90]
+        for i, twist in enumerate(common_twists):
+            twist_label = QLabel(f"{twist}°")
+            twist_color_layout.addWidget(twist_label, i + 1, 0)
+            
+            color_edit = QLineEdit()
+            color_edit.setPlaceholderText('#RRGGBB')
+            color_edit.setMaximumWidth(120)
+            color_edit.textChanged.connect(lambda text, t=twist: self._update_twist_color(t, text))
+            twist_color_layout.addWidget(color_edit, i + 1, 1)
+            
+            self.twist_color_edits[twist] = color_edit
+        
+        apply_twist_btn = QPushButton("Apply Twist Colors")
+        apply_twist_btn.clicked.connect(self._apply_twist_colors)
+        twist_color_layout.addWidget(apply_twist_btn, len(common_twists) + 1, 0, 1, 2)
+        
+        reset_twist_btn = QPushButton("Reset to Palette Defaults")
+        reset_twist_btn.clicked.connect(self._reset_twist_colors)
+        twist_color_layout.addWidget(reset_twist_btn, len(common_twists) + 2, 0, 1, 2)
+        
+        layout.addWidget(twist_color_group)
+        
         # Publish all overview plots
         puball_group = QGroupBox("Publish All Overview Plots")
         puball_layout = QHBoxLayout(puball_group)
@@ -341,9 +459,75 @@ class PowerStrokeOverviewGUI(QMainWindow):
         puball_layout.addWidget(self.publish_all_button)
         puball_layout.addStretch()
         layout.addWidget(puball_group)
+        
+        layout.addStretch()
 
         self.tab_widget.addTab(tab, "Overview Settings")
 
+    def _update_baseline_params(self):
+        """Update baseline parameters from UI controls"""
+        self.baseline_params['twist'] = self.baseline_twist.value()
+        self.baseline_params['sweep'] = self.baseline_sweep.value()
+        self.baseline_params['period'] = self.baseline_period.value()
+        self.baseline_params['flow'] = self.baseline_flow.value()
+        
+    def _update_baseline_color(self, text):
+        """Update baseline color"""
+        self.baseline_color = text.strip()
+        
+    def _update_baseline_linestyle(self, text):
+        """Update baseline line style"""
+        self.baseline_line_style = text
+        
+    def _update_twist_color(self, twist, color):
+        """Update color for a specific twist value (called on text change)"""
+        # Don't apply immediately, wait for Apply button
+        pass
+        
+    def _apply_twist_colors(self):
+        """Apply custom twist colors from UI controls"""
+        self.custom_twist_colors = {}
+        for twist, edit in self.twist_color_edits.items():
+            color = edit.text().strip()
+            if color:
+                # Ensure it starts with #
+                if not color.startswith('#'):
+                    color = '#' + color
+                self.custom_twist_colors[float(twist)] = color
+        
+        # Rebuild the twist color map
+        self.twist_color_map = self._build_twist_color_map()
+        
+        # Update status
+        self.statusBar().showMessage(f"Applied custom twist colors for {len(self.custom_twist_colors)} twist values")
+        
+    def _reset_twist_colors(self):
+        """Reset twist colors to palette defaults"""
+        self.custom_twist_colors = {}
+        
+        # Clear all text edits
+        for edit in self.twist_color_edits.values():
+            edit.clear()
+        
+        # Rebuild the twist color map from palette
+        self.twist_color_map = self._build_twist_color_map()
+        
+        # Populate the fields with current palette colors
+        if hasattr(self, 'twist_color_map'):
+            for twist, edit in self.twist_color_edits.items():
+                if float(twist) in self.twist_color_map:
+                    color = self.twist_color_map[float(twist)]
+                    edit.setText(color)
+        
+        self.statusBar().showMessage("Reset twist colors to palette defaults")
+        
+    def _is_baseline_experiment(self, flow, period, sweep, twist):
+        """Check if the given parameters match the baseline"""
+        return (abs(flow - self.baseline_params['flow']) < 0.01 and
+                abs(period - self.baseline_params['period']) < 0.1 and
+                abs(sweep - self.baseline_params['sweep']) < 1.0 and
+                abs(twist - self.baseline_params['twist']) < 1.0)
+    
     def _on_palette_selection_changed(self, text):
         self.overview_palette_choice = text
         enable = (text == 'Custom')
@@ -476,9 +660,36 @@ class PowerStrokeOverviewGUI(QMainWindow):
             pass
         self.statusBar().showMessage(f"Published overview plots to {outdir}")
 
-    def _normalize_time_vector(self, time_vector: np.ndarray) -> np.ndarray:
-        """Return absolute time; normalization disabled for Power stroke."""
-        return np.asarray(time_vector, dtype=float)
+    def _normalize_time_vector(self, time_vector: np.ndarray, period: float) -> np.ndarray:
+        """
+        Normalize power stroke time vector to [0, 0.4] range (power stroke portion of full period).
+        Power stroke starts at t=0 and occupies the first 40% of the full period.
+        """
+        # Get the power stroke window for this period
+        if abs(period - 1.75) < 0.1:
+            power_window = self.power_stroke_windows[1.75]
+        elif abs(period - 2.25) < 0.1:
+            power_window = self.power_stroke_windows[2.25]
+        else:
+            power_window = self.power_stroke_windows[1.75] if period < 2.0 else self.power_stroke_windows[2.25]
+        
+        start_time = power_window['start']
+        end_time = power_window['end']
+        
+        # Apply mask to get windowed data
+        mask = (time_vector >= start_time) & (time_vector <= end_time)
+        t_windowed = time_vector[mask]
+        
+        # Map to [0, 0.4] range (power stroke portion)
+        if len(t_windowed) > 0:
+            t_norm = np.linspace(0.0, 0.4, len(t_windowed))
+            
+            # Create full normalized array with NaN for out-of-window values
+            t_norm_full = np.full_like(time_vector, np.nan, dtype=float)
+            t_norm_full[mask] = t_norm
+            return t_norm_full
+        else:
+            return np.full_like(time_vector, np.nan, dtype=float)
             
     def _seed_defaults(self):
         """Seed default values for dataset selectors (from original GUI)"""
@@ -581,7 +792,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
             
             
         
-    # Window finder removed – timeline is fixed to normalized [0,1]
+    # Window finder removed ΓÇô timeline is fixed to normalized [0,1]
         
     def _build_selector_row(self, parent_layout, idx):
         """Build a dataset selector row (from original GUI)"""
@@ -806,7 +1017,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         axis_layout = QGridLayout(axis_frame)
         
         self.xmin_var = QLineEdit("0.0")
-        self.xmax_var = QLineEdit("1.0")
+        self.xmax_var = QLineEdit("0.4")
         self.xstep_var = QLineEdit("0.1")
         self.ymin_var = QLineEdit("-5.0")
         self.ymax_var = QLineEdit("5.0")
@@ -851,7 +1062,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         # X label controls
         self.xlabel_on_var = QCheckBox("X Label")
         self.xlabel_on_var.setChecked(True)
-        self.xlabel_text_var = QLineEdit("Time (s)")
+        self.xlabel_text_var = QLineEdit("Normalized Time (0-0.4)")
         self.xlabel_font_var = QComboBox()
         self.xlabel_font_var.addItems(font_choices)
         self.xlabel_font_var.setCurrentText('Default')
@@ -944,7 +1155,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         
         traces_layout.addWidget(ctrl_frame)
         
-        # Window finder removed – x-axis is fixed normalized [0,1]
+        # Window finder removed ΓÇô x-axis is fixed normalized [0,1]
         
         # Dataset selectors (up to 10) - EXACT copy
         sel_frame = QGroupBox("Datasets (up to 10)")
@@ -1094,24 +1305,29 @@ class PowerStrokeOverviewGUI(QMainWindow):
                     
                 exp_data = self.data['experiments'][exp_key]
                 print(f"DEBUG: Found experiment data for {exp_key}")
-                # Normalize absolute time to [0,1] based on [0.75, 2.25]
-                t_abs = np.asarray(exp_data['time_vector'])
-                print(f"DEBUG: Time vector shape: {t_abs.shape}, range: {t_abs.min():.3f} to {t_abs.max():.3f}")
-                t = self._normalize_time_vector(t_abs)
-                # Use absolute time directly; no normalization window
-                mask_domain = np.ones_like(t, dtype=bool)
+                
+                # Get time vector and normalize to [0, 0.4] (power stroke portion)
+                t_abs = np.asarray(exp_data.get('time_vector', []))
+                t_norm = self._normalize_time_vector(t_abs, period)
+                mask_domain = ~np.isnan(t_norm)
+                
+                if not np.any(mask_domain):
+                    print(f"DEBUG: No valid data in normalization window")
+                    continue
+                
+                # Plot trace against normalized time
                 if self.channel_var.currentText() == 'thrust':
-                    y = np.asarray(exp_data['thrust_mean'])
+                    y = np.asarray(exp_data['thrust_mean'])[mask_domain]
                     ystd_full = exp_data.get('thrust_std', None)
-                    ystd = np.asarray(ystd_full) if ystd_full is not None else None
+                    ystd = np.asarray(ystd_full)[mask_domain] if ystd_full is not None else None
                     label = f"T: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}"
-                    print(f"DEBUG: Thrust data shape: {y.shape}, range: {y.min():.3f} to {y.max():.3f}")
                 else:
                     y = np.asarray(exp_data['lift_mean'])[mask_domain]
                     ystd_full = exp_data.get('lift_std', None)
                     ystd = np.asarray(ystd_full)[mask_domain] if ystd_full is not None else None
                     label = f"L: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}"
-                    print(f"DEBUG: Lift data shape: {y.shape}, range: {y.min():.3f} to {y.max():.3f}")
+                
+                x = t_norm[mask_domain]
 
                 # Styles
                 color = None
@@ -1155,24 +1371,33 @@ class PowerStrokeOverviewGUI(QMainWindow):
                     legend_on = True
                     legend_label = ''
 
-                # Determine color by scheme
-                scheme = self.color_scheme_var.currentText()
-                if scheme == 'Custom':
-                    # Use user-entered color if provided; else fallback to default palette
-                    if cval:
-                        color = cval
-                    else:
-                        color = self._palette_color('Default', row_index_for_palette)
+                # Check if this is the baseline experiment
+                is_baseline = self._is_baseline_experiment(flow, period, yaw, roll)
+                
+                # Determine color and linestyle (or use baseline settings if this is the baseline)
+                if is_baseline:
+                    color = self.baseline_color
+                    linestyle = self.baseline_line_style
+                    plot_label = 'BASELINE' if legend_on else '_nolegend_'
                 else:
-                    color = self._palette_color(scheme, row_index_for_palette)
+                    scheme = self.color_scheme_var.currentText()
+                    if scheme == 'Custom':
+                        # Use user-entered color if provided; else fallback to default palette
+                        if cval:
+                            color = cval
+                        else:
+                            color = self._palette_color('Default', row_index_for_palette)
+                    else:
+                        color = self._palette_color(scheme, row_index_for_palette)
+                    linestyle = '-'  # Solid line for non-baseline
+                    plot_label = legend_label if legend_on and legend_label else '_nolegend_'
 
                 # Variance shading (mean ± std)
                 if include_var and ystd is not None:
-                    self.ax.fill_between(t, y - ystd, y + ystd, color=color, alpha=max(0.0, min(alpha, 1.0)), linewidth=0)
+                    self.ax.fill_between(x, y - ystd, y + ystd, color=color, alpha=max(0.0, min(alpha, 1.0)), linewidth=0)
 
                 # Mean line with legend label control
-                plot_label = legend_label if legend_on and legend_label else '_nolegend_'
-                self.ax.plot(t[mask_domain], y, linewidth=max(0.5, lw), label=plot_label, color=color)
+                self.ax.plot(x, y, linewidth=max(0.5, lw), linestyle=linestyle, label=plot_label, color=color)
 
             if selections and self.legend_on_var.isChecked():
                 loc = self.legend_loc_var.currentText() if self.legend_loc_var.currentText() else 'best'
@@ -1185,8 +1410,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
                 except Exception:
                     return default
 
-            xmin = 0.0
-            xmax = 1.0
+            xmin = _parse_float(self.xmin_var.text(), 0.0)
+            xmax = _parse_float(self.xmax_var.text(), 0.4)
             ymin = _parse_float(self.ymin_var.text(), -5.0)
             ymax = _parse_float(self.ymax_var.text(), 5.0)
             xstep = _parse_float(self.xstep_var.text(), 0.1)
@@ -1312,7 +1537,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         mf_fixed_frame = QGroupBox("Fixed Parameters")
         mf_fixed_layout = QHBoxLayout(mf_fixed_frame)
         mf_fixed_layout.setContentsMargins(5, 5, 5, 5)
-        self.mean_force_fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s")
+        self.mean_force_fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80┬░ | Period: 2.25s")
         mf_fixed_layout.addWidget(self.mean_force_fixed_params_label)
         top_layout.addWidget(mf_fixed_frame)
         
@@ -1546,7 +1771,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         peak_fixed = QGroupBox("Fixed Parameters")
         peak_fixed_layout = QHBoxLayout(peak_fixed)
         peak_fixed_layout.setContentsMargins(5, 5, 5, 5)
-        self.peak_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s")
+        self.peak_fixed_params_label = QLabel("Flow: Variable | Sweep: 80┬░ | Period: 2.25s")
         peak_fixed_layout.addWidget(self.peak_fixed_params_label)
         top_layout.addWidget(peak_fixed)
 
@@ -1733,7 +1958,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
             return
         # Fixed label + values
         if self.peak_flow_radio.isChecked():
-            self.peak_fixed_params_label.setText("Flow: Variable | Sweep: 80° | Period: 2.25s")
+            self.peak_fixed_params_label.setText("Flow: Variable | Sweep: 80┬░ | Period: 2.25s")
             values = self.get_available_flow_values(); label_name = 'flow'
         elif self.peak_sweep_radio.isChecked():
             self.peak_fixed_params_label.setText("Flow: 0.1 | Sweep: Variable | Period: 2.25s")
@@ -1790,7 +2015,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         vec_fixed = QGroupBox("Fixed Parameters")
         vec_fixed_layout = QHBoxLayout(vec_fixed)
         vec_fixed_layout.setContentsMargins(5, 5, 5, 5)
-        self.vec_fixed_params_label = QLabel("Flow: Variable | Sweep: 80° | Period: 2.25s")
+        self.vec_fixed_params_label = QLabel("Flow: Variable | Sweep: 80┬░ | Period: 2.25s")
         vec_fixed_layout.addWidget(self.vec_fixed_params_label)
         top_layout.addWidget(vec_fixed)
 
@@ -1927,7 +2152,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         if not self.data or 'experiments' not in self.data:
             return
         if self.vec_flow_radio.isChecked():
-            self.vec_fixed_params_label.setText("Flow: Variable | Sweep: 80° | Period: 2.25s")
+            self.vec_fixed_params_label.setText("Flow: Variable | Sweep: 80┬░ | Period: 2.25s")
             values = self.get_available_flow_values(); label_name = 'flow'
         elif self.vec_sweep_radio.isChecked():
             self.vec_fixed_params_label.setText("Flow: 0.1 | Sweep: Variable | Period: 2.25s")
@@ -1988,7 +2213,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         fixed_frame = QGroupBox("Fixed Parameters")
         fixed_layout = QHBoxLayout(fixed_frame)
         
-        self.fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80° | Period: 2.25s")
+        self.fixed_params_label = QLabel("Flow: 0.1 | Sweep: 80┬░ | Period: 2.25s")
         fixed_layout.addWidget(self.fixed_params_label)
         fixed_layout.addStretch()
         
@@ -2075,7 +2300,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         # Get available parameter values based on selected variable
         if self.flow_radio.isChecked():
             # Flow mode: show flow values, fixed sweep=80, period=2.25
-            self.fixed_params_label.setText("Flow: Variable | Sweep: 80° | Period: 2.25s")
+            self.fixed_params_label.setText("Flow: Variable | Sweep: 80┬░ | Period: 2.25s")
             param_values = self.get_available_flow_values()
             param_name = "flow"
         elif self.sweep_radio.isChecked():
@@ -2191,7 +2416,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
             if not experiments:
                 continue
                 
-            # Calculate windowed means for each experiment (fixed normalization [0.75,2.25]→[0,1])
+            # Calculate windowed means for each experiment (fixed normalization [0.75,2.25]ΓåÆ[0,1])
             twist_values = []
             mean_values = []
             
@@ -2428,8 +2653,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
             
             for exp_key in experiments:
                 exp_data = self.data['experiments'][exp_key]
-                params = exp_data['parameters']
-                twist = abs(params.get('roll_angle', 0))
+                m = self._param_map(exp_data['parameters'])
+                twist = m['twist']
                 if selected_twists is not None and twist not in selected_twists:
                     continue
                 
@@ -2557,7 +2782,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         # Determine variable and fixed label
         if self.mean_force_flow_radio.isChecked():
             print("DEBUG: Flow radio button is checked")
-            self.mean_force_fixed_params_label.setText("Flow: Variable | Sweep: 80° | Period: 2.25s")
+            self.mean_force_fixed_params_label.setText("Flow: Variable | Sweep: 80┬░ | Period: 2.25s")
             values = self.get_available_flow_values()
             label_name = "flow"
         elif self.mean_force_sweep_radio.isChecked():
@@ -2811,12 +3036,13 @@ class PowerStrokeOverviewGUI(QMainWindow):
                 lift = np.asarray(exp.get('lift_mean', []))
                 if t_abs.size == 0 or thrust.size == 0 or lift.size == 0:
                     continue
-                t_norm = self._normalize_time_vector(t_abs)
-                mask = (t_norm >= 0.0) & (t_norm <= 1.0)
+                period = m.get('stroke_period', 2.25)
+                t_norm = self._normalize_time_vector(t_abs, period)
+                mask = ~np.isnan(t_norm)  # Only use non-NaN values (within window)
                 if not np.any(mask):
                     continue
-                mt = float(np.mean(thrust))
-                ml = float(np.mean(lift))
+                mt = float(np.mean(thrust[mask]))
+                ml = float(np.mean(lift[mask]))
                 color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
                 # draw shaft with pronounced dashes, then draw a solid head only
                 line, = ax.plot([0, mt], [0, ml], color=color, linewidth=lw, alpha=0.95, solid_capstyle='round')
@@ -2892,7 +3118,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
                 
         return selected_experiments
         
-    # Window controls removed – domain is fixed to 0..1
+    # Window controls removed ΓÇô domain is fixed to 0..1
         
     def create_menu_bar(self):
         """Create the menu bar"""
@@ -3259,12 +3485,13 @@ class PowerStrokeOverviewGUI(QMainWindow):
             thrust_trace = exp_data['thrust_mean']
             lift_trace = exp_data['lift_mean']
             time_vector = exp_data['time_vector']
+            period = params.get('stroke_period', 2.25)
             
-            # Normalize absolute time to fixed 0-1 combined stroke phase
-            time_norm = self._normalize_time_vector(time_vector)
+            # Normalize absolute time to [0, 0.4] (power stroke portion)
+            time_norm = self._normalize_time_vector(time_vector, period)
             
-            # Apply fixed domain
-            window_mask = (time_norm >= 0.0) & (time_norm <= 1.0)
+            # Apply window mask (only non-NaN values)
+            window_mask = ~np.isnan(time_norm)
             thrust_windowed = thrust_trace[window_mask]
             lift_windowed = lift_trace[window_mask]
             time_windowed = time_norm[window_mask]
@@ -3408,12 +3635,12 @@ class PowerStrokeOverviewGUI(QMainWindow):
                     item.widget().deleteLater()
         except RuntimeError:
             pass
-        # Build row of checkboxes: | [x] 0° | [x] 15° | ... |
+        # Build row of checkboxes: | [x] 0┬░ | [x] 15┬░ | ... |
         checks = {}
         allowed_default = {0, 15, 30, 45, 60, 75, 90}
         for t in twists:
             w = QWidget(); hl = QHBoxLayout(w); hl.setContentsMargins(4,0,4,0)
-            cb = QCheckBox(f"{int(t)}°")
+            cb = QCheckBox(f"{int(t)}┬░")
             checked = int(round(float(t))) in allowed_default
             cb.setChecked(checked)
             hl.addWidget(cb); layout.addWidget(w)

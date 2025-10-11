@@ -20,9 +20,9 @@ class PaddleStrokeProcessor:
     def __init__(self):
         self.sampling_rate = 500.0
         self.median_window = 11
-        self.cutoff_freq = 4.0
+        self.cutoff_freq = 9.0
         self.arduino_median_window = 21
-        self.before_trial_include = 10
+        self.before_trial_include = {1.75: 0, 2.25: 0}  # samples per period
         self.low_threshold = 1.5
         self.high_threshold = 2.0
         
@@ -31,7 +31,7 @@ class PaddleStrokeProcessor:
         self.flow_map = {0.0: 0.0, 70.0: 0.1}
         
         # Trial length by period
-        self.trial_lengths = {1.75: 200, 2.25: 290}
+        self.trial_lengths = {1.75: 200, 2.25: 225}
         
     def apply_zero_correction(self, data_3xT: np.ndarray) -> np.ndarray:
         """Apply zero correction to thrust and lift channels"""
@@ -80,6 +80,7 @@ class PaddleStrokeProcessor:
         
         # Get trial length for this period
         trial_length = self.trial_lengths.get(period, 200)
+        before_trial = self.before_trial_include.get(period, 0)
         
         # Find Arduino start (first rising edge)
         base = float(np.median(ard[:50])) if ard.size >= 50 else float(np.median(ard))
@@ -99,7 +100,7 @@ class PaddleStrokeProcessor:
             start_idx = int(rising[0])
         
         # Extract trial segment
-        start = start_idx - self.before_trial_include
+        start = start_idx - before_trial
         start = max(0, start)
         end = min(start + trial_length, d.shape[1])
         
