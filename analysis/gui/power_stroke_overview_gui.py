@@ -130,8 +130,16 @@ class PowerStrokeOverviewGUI(QMainWindow):
         self.baseline_color = '#FF0000'  # Red for baseline
         self.baseline_line_style = '--'  # Dashed line for baseline
         
-        # Custom twist color overrides (empty initially, user can set)
-        self.custom_twist_colors = {}
+        # Custom twist color overrides (set to default colors from screenshot)
+        self.custom_twist_colors = {
+            0.0: '#377eb8',    # Blue
+            15.0: '#4daf4a',   # Green
+            30.0: '#984ea3',   # Purple
+            45.0: '#ff7f00',   # Orange
+            60.0: '#a65628',   # Brown
+            75.0: '#f781bf',   # Pink
+            90.0: '#999999'    # Gray
+        }
         
         # Power stroke trimming windows (in absolute time coordinates)
         # These define where valid power stroke data exists (trimming artifacts at edges)
@@ -323,7 +331,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
         elif choice == 'CB friendly':
             palette = ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
         else:
-            palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+            # Default palette matching the twist color mapping screenshot
+            palette = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#a65628', '#f781bf', '#999999']
         
         # Build color map from palette
         color_map = {tw: palette[idx % len(palette)] for idx, tw in enumerate(twists)}
@@ -436,6 +445,9 @@ class PowerStrokeOverviewGUI(QMainWindow):
             color_edit.setPlaceholderText('#RRGGBB')
             color_edit.setMaximumWidth(120)
             color_edit.textChanged.connect(lambda text, t=twist: self._update_twist_color(t, text))
+            # Set default color from our custom twist colors
+            if twist in self.custom_twist_colors:
+                color_edit.setText(self.custom_twist_colors[twist])
             twist_color_layout.addWidget(color_edit, i + 1, 1)
             
             self.twist_color_edits[twist] = color_edit
@@ -729,8 +741,7 @@ class PowerStrokeOverviewGUI(QMainWindow):
         default_yaw_value = '80'
         
         default_colors = [
-            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+            '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#a65628', '#f781bf', '#999999'
         ]
         
         for i, row in enumerate(self.dataset_rows):
@@ -839,7 +850,8 @@ class PowerStrokeOverviewGUI(QMainWindow):
         # Color selector
         row_layout.addWidget(QLabel("Color"))
         color_var = QLineEdit()
-        default_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        # Use our custom twist colors as defaults
+        default_colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#a65628', '#f781bf', '#999999']
         color_var.setText(default_colors[idx % len(default_colors)])
         color_var.setMaximumWidth(90)
         row_layout.addWidget(color_var)
@@ -1601,13 +1613,13 @@ class PowerStrokeOverviewGUI(QMainWindow):
         axes_layout = QHBoxLayout(axes_frame)
         axes_layout.setContentsMargins(5, 5, 5, 5)
         axes_layout.addWidget(QLabel("X min"))
-        self.mf_xmin = QLineEdit("")
-        self.mf_xmin.setPlaceholderText("auto")
+        self.mf_xmin = QLineEdit("-5")
+        self.mf_xmin.setPlaceholderText("-5")
         self.mf_xmin.setMaximumWidth(60)
         axes_layout.addWidget(self.mf_xmin)
         axes_layout.addWidget(QLabel("X max"))
-        self.mf_xmax = QLineEdit("")
-        self.mf_xmax.setPlaceholderText("auto")
+        self.mf_xmax = QLineEdit("95")
+        self.mf_xmax.setPlaceholderText("95")
         self.mf_xmax.setMaximumWidth(60)
         axes_layout.addWidget(self.mf_xmax)
         axes_layout.addWidget(QLabel("Y min"))
@@ -1679,11 +1691,12 @@ class PowerStrokeOverviewGUI(QMainWindow):
         tick_frame = QGroupBox("Tick Steps")
         tick_layout = QHBoxLayout(tick_frame)
         tick_layout.setContentsMargins(5, 5, 5, 5)
-        tick_layout.addWidget(QLabel("X step"))
-        self.mf_xtick_step = QLineEdit("")
-        self.mf_xtick_step.setPlaceholderText("auto")
-        self.mf_xtick_step.setMaximumWidth(60)
-        tick_layout.addWidget(self.mf_xtick_step)
+        tick_layout.addWidget(QLabel("X ticks"))
+        self.mf_xticks_text = QLineEdit("0:15:90")
+        self.mf_xticks_text.setPlaceholderText("0:15:90")
+        self.mf_xticks_text.setMaximumWidth(80)
+        self.mf_xticks_text.setToolTip("Format: start:step:end (e.g., 0:15:90)")
+        tick_layout.addWidget(self.mf_xticks_text)
         tick_layout.addWidget(QLabel("Y step"))
         self.mf_ytick_step = QLineEdit("")
         self.mf_ytick_step.setPlaceholderText("auto")
@@ -2739,11 +2752,21 @@ class PowerStrokeOverviewGUI(QMainWindow):
                 return float(s)
             except Exception:
                 return default
-        xstep = _pf(self.mf_xtick_step.text())
+        
+        # Parse X ticks (format: start:step:end, e.g., "0:15:90")
+        xticks_text = self.mf_xticks_text.text().strip() if hasattr(self, 'mf_xticks_text') else ""
+        if xticks_text:
+            try:
+                parts = xticks_text.split(':')
+                if len(parts) == 3:
+                    start, step, end = float(parts[0]), float(parts[1]), float(parts[2])
+                    xticks = np.arange(start, end + step/2, step)
+                    ax.set_xticks(xticks)
+            except Exception as e:
+                print(f"Warning: Could not parse x ticks '{xticks_text}': {e}")
+        
+        # Y tick step
         ystep = _pf(self.mf_ytick_step.text())
-        if xstep and xstep > 0:
-            xmin_cur, xmax_cur = ax.get_xlim()
-            ax.set_xticks(np.arange(xmin_cur, xmax_cur + 0.5 * xstep, xstep))
         if ystep and ystep > 0:
             ymin_cur, ymax_cur = ax.get_ylim()
             ax.set_yticks(np.arange(ymin_cur, ymax_cur + 0.5 * ystep, ystep))
@@ -2904,23 +2927,12 @@ class PowerStrokeOverviewGUI(QMainWindow):
                     ysig = np.asarray(exp.get('lift_mean', []))
                 if t_abs.size == 0 or ysig.size == 0:
                     continue
-                # Use absolute time; consider peaks after a small initial region (e.g., >0.05s)
-                min_time = 0.05
-                mask = (t_abs >= min_time)
-                if mask.sum() < 3:
-                    continue
-                phase_seg = t_abs[mask]
-                y_seg = ysig[mask]
-                # Smoothing and first peak only (Power stroke): first significant extremum after min_time
-                y_sm = _smooth_signal(y_seg, window_size=5)
-                amp = float(np.nanmax(np.abs(y_sm))) if y_sm.size > 0 else 0.0
-                thr = max(0.15, 0.12 * amp)
+                # For Power stroke: simply find the maximum thrust/lift across the entire trace
                 pts = []
-                idxs = np.where((np.abs(y_sm) >= thr))[0]
-                idxs = [i for i in idxs if phase_seg[i] >= min_time]
-                if len(idxs) > 0:
-                    i = int(idxs[0])
-                    pts.append((float(phase_seg[i]), float(y_seg[i])))
+                if len(ysig) > 0:
+                    # Find the index of the maximum absolute value in the entire trace
+                    max_idx = np.argmax(np.abs(ysig))
+                    pts.append((float(t_abs[max_idx]), float(ysig[max_idx])))
 
                 if len(pts) == 0:
                     continue
