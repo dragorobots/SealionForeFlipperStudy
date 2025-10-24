@@ -118,6 +118,27 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         }
         self.dataset_rows = []
         
+        # Baseline experimental parameters
+        self.baseline_params = {
+            'flow': 0.1,
+            'period': 2.25,
+            'sweep': 80.0,
+            'twist': 0.0
+        }
+        self.baseline_color = '#FF0000'  # Red
+        self.baseline_line_style = '--'
+        
+        # Custom twist color mapping (default color scheme)
+        self.custom_twist_colors = {
+            0: '#1f77b4',   # blue
+            15: '#ff7f0e',  # orange
+            30: '#2ca02c',  # green
+            45: '#d62728',  # red
+            60: '#9467bd',  # purple
+            75: '#8c564b',  # brown
+            90: '#e377c2'   # pink
+        }
+        
         # Full Stroke normalization windows (used for normalizing to [0,1])
         # These are the reference windows from Full Stroke analysis
         self.full_stroke_windows = {
@@ -314,14 +335,28 @@ class PaddleStrokeOverviewGUI(QMainWindow):
     def _build_twist_color_map(self):
         """Create a categorical color map for twist values (consistent across app)."""
         twists = self.param_index.get('twist', [])
-        choice = getattr(self, 'overview_palette_choice', 'Default')
-        if choice == 'Custom' and hasattr(self, 'overview_custom_colors') and self.overview_custom_colors:
-            palette = list(self.overview_custom_colors)
-        elif choice == 'CB friendly':
-            palette = ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
-        else:
-            palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-        return {tw: palette[idx % len(palette)] for idx, tw in enumerate(twists)}
+        
+        # Use custom twist colors if available, otherwise fall back to palette
+        color_map = {}
+        for tw in twists:
+            if tw in self.custom_twist_colors:
+                color_map[tw] = self.custom_twist_colors[tw]
+            else:
+                # Fall back to palette for twists not in custom colors
+                choice = getattr(self, 'overview_palette_choice', 'Default')
+                if choice == 'Custom' and hasattr(self, 'overview_custom_colors') and self.overview_custom_colors:
+                    palette = list(self.overview_custom_colors)
+                elif choice == 'CB friendly':
+                    palette = ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
+                else:
+                    palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+                
+                # Find index of this twist in the sorted list
+                sorted_twists = sorted(twists)
+                idx = sorted_twists.index(tw)
+                color_map[tw] = palette[idx % len(palette)]
+        
+        return color_map
 
     def create_overview_settings_tab(self):
         tab = QWidget()
@@ -351,6 +386,110 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         apply_btn.clicked.connect(self._apply_overview_palette)
         palette_layout.addWidget(apply_btn, 3, 5)
         layout.addWidget(palette_group)
+
+        # Baseline Experimental Parameters
+        baseline_group = QGroupBox("Baseline Experimental Parameters")
+        baseline_layout = QGridLayout(baseline_group)
+        
+        # Flow parameter
+        baseline_layout.addWidget(QLabel("Flow:"), 0, 0)
+        self.baseline_flow = QDoubleSpinBox()
+        self.baseline_flow.setRange(0.0, 2.0)
+        self.baseline_flow.setValue(0.1)
+        self.baseline_flow.setDecimals(2)
+        self.baseline_flow.setSingleStep(0.1)
+        self.baseline_flow.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_flow, 0, 1)
+        
+        # Period parameter
+        baseline_layout.addWidget(QLabel("Period:"), 0, 2)
+        self.baseline_period = QDoubleSpinBox()
+        self.baseline_period.setRange(1.0, 3.0)
+        self.baseline_period.setValue(2.25)
+        self.baseline_period.setDecimals(2)
+        self.baseline_period.setSingleStep(0.25)
+        self.baseline_period.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_period, 0, 3)
+        
+        # Sweep parameter
+        baseline_layout.addWidget(QLabel("Sweep:"), 1, 0)
+        self.baseline_sweep = QDoubleSpinBox()
+        self.baseline_sweep.setRange(0.0, 90.0)
+        self.baseline_sweep.setValue(80.0)
+        self.baseline_sweep.setDecimals(0)
+        self.baseline_sweep.setSingleStep(15.0)
+        self.baseline_sweep.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_sweep, 1, 1)
+        
+        # Twist parameter
+        baseline_layout.addWidget(QLabel("Twist:"), 1, 2)
+        self.baseline_twist = QDoubleSpinBox()
+        self.baseline_twist.setRange(0.0, 90.0)
+        self.baseline_twist.setValue(0.0)
+        self.baseline_twist.setDecimals(0)
+        self.baseline_twist.setSingleStep(15.0)
+        self.baseline_twist.valueChanged.connect(self._update_baseline_params)
+        baseline_layout.addWidget(self.baseline_twist, 1, 3)
+        
+        # Baseline color
+        baseline_layout.addWidget(QLabel("Color:"), 2, 0)
+        self.baseline_color_edit = QLineEdit()
+        self.baseline_color_edit.setText("#FF0000")
+        self.baseline_color_edit.setPlaceholderText("#RRGGBB")
+        self.baseline_color_edit.textChanged.connect(self._update_baseline_color)
+        baseline_layout.addWidget(self.baseline_color_edit, 2, 1)
+        
+        # Baseline line style
+        baseline_layout.addWidget(QLabel("Line Style:"), 2, 2)
+        self.baseline_linestyle_combo = QComboBox()
+        self.baseline_linestyle_combo.addItems(['-', '--', '-.', ':', 'None'])
+        self.baseline_linestyle_combo.setCurrentText('--')
+        self.baseline_linestyle_combo.currentTextChanged.connect(self._update_baseline_linestyle)
+        baseline_layout.addWidget(self.baseline_linestyle_combo, 2, 3)
+        
+        # Info label
+        info_label = QLabel("Baseline experiments will be highlighted with the specified color and line style.")
+        info_label.setStyleSheet("color: gray; font-style: italic;")
+        baseline_layout.addWidget(info_label, 3, 0, 1, 4)
+        
+        # Update baseline settings button
+        update_baseline_btn = QPushButton("Update Baseline Settings")
+        update_baseline_btn.setStyleSheet("QPushButton { background-color: #0078d4; color: white; font-weight: bold; }")
+        update_baseline_btn.clicked.connect(self._update_baseline_settings)
+        baseline_layout.addWidget(update_baseline_btn, 4, 0, 1, 4)
+        
+        layout.addWidget(baseline_group)
+
+        # Twist Color Mapping (Override Palette)
+        twist_color_group = QGroupBox("Twist Color Mapping (Override Palette)")
+        twist_color_layout = QGridLayout(twist_color_group)
+        
+        twist_angles = [0, 15, 30, 45, 60, 75, 90]
+        self.twist_color_edits = {}
+        
+        for i, angle in enumerate(twist_angles):
+            row = i // 4
+            col = (i % 4) * 2
+            
+            twist_color_layout.addWidget(QLabel(f"{angle}°:"), row, col)
+            edit = QLineEdit()
+            edit.setText(self.custom_twist_colors[angle])
+            edit.setPlaceholderText('#RRGGBB')
+            edit.setMaximumWidth(90)
+            edit.textChanged.connect(lambda text, a=angle: self._update_twist_color(a, text))
+            self.twist_color_edits[angle] = edit
+            twist_color_layout.addWidget(edit, row, col + 1)
+        
+        # Apply and Reset buttons
+        apply_twist_btn = QPushButton("Apply Twist Colors")
+        apply_twist_btn.clicked.connect(self._apply_twist_colors)
+        twist_color_layout.addWidget(apply_twist_btn, 2, 6)
+        
+        reset_twist_btn = QPushButton("Reset to Palette Defaults")
+        reset_twist_btn.clicked.connect(self._reset_twist_colors)
+        twist_color_layout.addWidget(reset_twist_btn, 2, 7)
+        
+        layout.addWidget(twist_color_group)
 
         # Publish all overview plots
         puball_group = QGroupBox("Publish All Overview Plots")
@@ -404,8 +543,127 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         except Exception:
             pass
 
+    def _update_baseline_params(self):
+        """Update baseline parameters from UI controls"""
+        self.baseline_params = {
+            'flow': self.baseline_flow.value(),
+            'period': self.baseline_period.value(),
+            'sweep': self.baseline_sweep.value(),
+            'twist': self.baseline_twist.value()
+        }
+        
+    def _update_baseline_color(self, text):
+        """Update baseline color"""
+        self.baseline_color = text.strip()
+        
+    def _update_baseline_linestyle(self, text):
+        """Update baseline line style"""
+        self.baseline_line_style = text
+        
+    def _update_baseline_settings(self):
+        """Update baseline settings and refresh all plots"""
+        # Update baseline parameters from UI controls
+        self._update_baseline_params()
+        self._update_baseline_color(self.baseline_color_edit.text())
+        self._update_baseline_linestyle(self.baseline_linestyle_combo.currentText())
+        
+        # Refresh all overview plots if they exist
+        try:
+            if hasattr(self, 'mean_force_canvas') and self.mean_force_canvas:
+                self.plot_mean_force()
+        except Exception as e:
+            print(f"Error refreshing mean force plot: {e}")
+            
+        try:
+            if hasattr(self, 'peak_location_canvas') and self.peak_location_canvas:
+                self.plot_peak_location()
+        except Exception as e:
+            print(f"Error refreshing peak location plot: {e}")
+            
+        try:
+            if hasattr(self, 'vector_canvas') and self.vector_canvas:
+                self.plot_vector()
+        except Exception as e:
+            print(f"Error refreshing vector plot: {e}")
+        
+        # Also refresh trial traces if they exist
+        try:
+            if hasattr(self, 'trial_trace_canvas') and self.trial_trace_canvas:
+                self.plot_trial_trace()
+        except Exception as e:
+            print(f"Error refreshing trial trace plot: {e}")
+            
+        print(f"Baseline settings updated: Flow={self.baseline_params['flow']}, "
+              f"Period={self.baseline_params['period']}, Sweep={self.baseline_params['sweep']}, "
+              f"Twist={self.baseline_params['twist']}, Color={self.baseline_color}, "
+              f"LineStyle={self.baseline_line_style}")
+        
+    def _update_twist_color(self, twist, color):
+        """Update twist color (no immediate action, just store)"""
+        self.custom_twist_colors[twist] = color.strip()
+        
+    def _apply_twist_colors(self):
+        """Apply custom twist colors and rebuild color map"""
+        # Update custom colors from UI
+        for angle, edit in self.twist_color_edits.items():
+            color = edit.text().strip()
+            if color:
+                if not color.startswith('#'):
+                    color = '#' + color
+                self.custom_twist_colors[angle] = color
+        
+        # Rebuild twist color map
+        try:
+            self.twist_color_map = self._build_twist_color_map()
+        except Exception:
+            pass
+        
+        # Redraw existing plots
+        try:
+            if hasattr(self, 'mean_force_canvas'):
+                self.plot_mean_force()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'peak_location_canvas'):
+                self.plot_peak_location()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'vector_canvas'):
+                self.plot_vector()
+        except Exception:
+            pass
+        
+    def _reset_twist_colors(self):
+        """Reset twist colors to palette defaults"""
+        # Reset to default color scheme
+        self.custom_twist_colors = {
+            0: '#1f77b4',   # blue
+            15: '#ff7f0e',  # orange
+            30: '#2ca02c',  # green
+            45: '#d62728',  # red
+            60: '#9467bd',  # purple
+            75: '#8c564b',  # brown
+            90: '#e377c2'   # pink
+        }
+        
+        # Update UI
+        for angle, edit in self.twist_color_edits.items():
+            edit.setText(self.custom_twist_colors[angle])
+        
+        # Rebuild color map and redraw
+        self._apply_twist_colors()
+        
+    def _is_baseline_experiment(self, flow, period, sweep, twist):
+        """Check if experiment parameters match baseline (with tolerance)"""
+        return (abs(flow - self.baseline_params['flow']) < 0.01 and
+                abs(period - self.baseline_params['period']) < 0.1 and
+                abs(sweep - self.baseline_params['sweep']) < 1.0 and
+                abs(twist - self.baseline_params['twist']) < 1.0)
+
     def publish_all_overview_plots(self):
-        outdir = os.path.join(os.getcwd(), f"Full_Stroke_Figures_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        outdir = os.path.join(os.getcwd(), f"Paddle_Stroke_Figures_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         try:
             os.makedirs(outdir, exist_ok=True)
         except Exception as e:
@@ -434,7 +692,7 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         # Mean plots
         for vname, vidx in variable_types:
             try:
-                [self.mean_force_flow_radio, self.mean_force_sweep_radio, self.mean_force_overlap_radio][vidx].setChecked(True)
+                [self.mean_force_flow_radio, self.mean_force_sweep_radio][vidx].setChecked(True)
                 self.update_mean_force_parameter_controls()
                 for cname, _ in channels:
                     self.mean_force_channel.setCurrentText(cname)
@@ -449,7 +707,7 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         # Peak plots
         for vname, vidx in variable_types:
             try:
-                [self.peak_flow_radio, self.peak_sweep_radio, self.peak_overlap_radio][vidx].setChecked(True)
+                [self.peak_flow_radio, self.peak_sweep_radio][vidx].setChecked(True)
                 self.update_peak_parameter_controls()
                 for cname, _ in channels:
                     self.peak_location_channel.setCurrentText(cname)
@@ -464,7 +722,7 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         # Vector plots
         for vname, vidx in variable_types:
             try:
-                [self.vec_flow_radio, self.vec_sweep_radio, self.vec_overlap_radio][vidx].setChecked(True)
+                [self.vec_flow_radio, self.vec_sweep_radio][vidx].setChecked(True)
                 self.update_vec_parameter_controls()
                 self.plot_vector()
                 wpx = int(float(self.vec_pub_w.text())); hpx = int(float(self.vec_pub_h.text()))
@@ -1536,9 +1794,17 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                     legend_on = True
                     legend_label = ''
 
+                # Check if this is a baseline experiment
+                is_baseline = self._is_baseline_experiment(flow, period, yaw, roll)
+                
                 # Determine color by scheme
                 scheme = self.color_scheme_var.currentText()
-                if scheme == 'Custom':
+                if is_baseline:
+                    # Use baseline color and styling for baseline experiments
+                    color = self.baseline_color if self.baseline_color.startswith('#') else '#' + self.baseline_color
+                    lw = lw * 2.0  # Make baseline traces thicker
+                    alpha = min(alpha * 1.5, 1.0)  # Make baseline traces more opaque
+                elif scheme == 'Custom':
                     # Use user-entered color if provided; else fallback to default palette
                     if cval:
                         color = cval
@@ -1552,8 +1818,22 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                     self.ax.fill_between(t, y - ystd, y + ystd, color=color, alpha=max(0.0, min(alpha, 1.0)), linewidth=0)
 
                 # Mean line with legend label control
-                plot_label = legend_label if legend_on and legend_label else '_nolegend_'
-                self.ax.plot(t, y, linewidth=max(0.5, lw), label=plot_label, color=color)
+                if is_baseline and legend_on:
+                    # Add baseline indicator to legend
+                    baseline_suffix = " (Baseline)"
+                    if legend_label:
+                        plot_label = legend_label + baseline_suffix
+                    else:
+                        plot_label = f"T: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}{baseline_suffix}" if self.channel_var.currentText() == 'thrust' else f"L: flow={flow}, P={period}, sweep={int(yaw)}, twist={int(roll)}{baseline_suffix}"
+                else:
+                    plot_label = legend_label if legend_on and legend_label else '_nolegend_'
+                
+                # Apply baseline line style if needed
+                if is_baseline:
+                    line_style = self.baseline_line_style if self.baseline_line_style != 'None' else '-'
+                    self.ax.plot(t, y, linewidth=max(0.5, lw), label=plot_label, color=color, linestyle=line_style)
+                else:
+                    self.ax.plot(t, y, linewidth=max(0.5, lw), label=plot_label, color=color)
 
             if selections and self.legend_on_var.isChecked():
                 loc = self.legend_loc_var.currentText() if self.legend_loc_var.currentText() else 'best'
@@ -1835,11 +2115,11 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         tick_frame = QGroupBox("Tick Steps")
         tick_layout = QHBoxLayout(tick_frame)
         tick_layout.setContentsMargins(5, 5, 5, 5)
-        tick_layout.addWidget(QLabel("X step"))
-        self.mf_xtick_step = QLineEdit("")
-        self.mf_xtick_step.setPlaceholderText("auto")
-        self.mf_xtick_step.setMaximumWidth(60)
-        tick_layout.addWidget(self.mf_xtick_step)
+        tick_layout.addWidget(QLabel("X format"))
+        self.mf_xticks_text = QLineEdit("")
+        self.mf_xticks_text.setPlaceholderText("start:step:end")
+        self.mf_xticks_text.setMaximumWidth(100)
+        tick_layout.addWidget(self.mf_xticks_text)
         tick_layout.addWidget(QLabel("Y step"))
         self.mf_ytick_step = QLineEdit("")
         self.mf_ytick_step.setPlaceholderText("auto")
@@ -1894,6 +2174,9 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         
         # Seed parameter controls
         self.update_mean_force_parameter_controls()
+        
+        # Populate twist checkboxes
+        self._populate_twist_checkboxes('mean')
         
         self.tab_widget.addTab(tab, "Mean Force")
         
@@ -2052,15 +2335,49 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         additional_layout.setContentsMargins(5, 5, 5, 5)
         additional_layout.setSpacing(10)
 
+        # Title controls
+        title_frame = QGroupBox("Title")
+        title_layout = QHBoxLayout(title_frame)
+        title_layout.setContentsMargins(5, 5, 5, 5)
+        self.pk_title_on = QCheckBox("Title")
+        title_layout.addWidget(self.pk_title_on)
+        self.pk_title_text = QLineEdit("")
+        self.pk_title_text.setPlaceholderText("auto")
+        self.pk_title_text.setMaximumWidth(150)
+        title_layout.addWidget(self.pk_title_text)
+        additional_layout.addWidget(title_frame)
+
+        # X Label controls
+        xlabel_frame = QGroupBox("X Label")
+        xlabel_layout = QHBoxLayout(xlabel_frame)
+        xlabel_layout.setContentsMargins(5, 5, 5, 5)
+        self.pk_xlabel_on = QCheckBox("X Label")
+        xlabel_layout.addWidget(self.pk_xlabel_on)
+        self.pk_xlabel_text = QLineEdit("Absolute Twist (degrees)")
+        self.pk_xlabel_text.setMaximumWidth(150)
+        xlabel_layout.addWidget(self.pk_xlabel_text)
+        additional_layout.addWidget(xlabel_frame)
+
+        # Y Label controls
+        ylabel_frame = QGroupBox("Y Label")
+        ylabel_layout = QHBoxLayout(ylabel_frame)
+        ylabel_layout.setContentsMargins(5, 5, 5, 5)
+        self.pk_ylabel_on = QCheckBox("Y Label")
+        ylabel_layout.addWidget(self.pk_ylabel_on)
+        self.pk_ylabel_text = QLineEdit("Peak Thrust Timing (Normalized)")
+        self.pk_ylabel_text.setMaximumWidth(150)
+        ylabel_layout.addWidget(self.pk_ylabel_text)
+        additional_layout.addWidget(ylabel_frame)
+
         # Tick step controls
         tick_frame = QGroupBox("Tick Steps")
         tick_layout = QHBoxLayout(tick_frame)
         tick_layout.setContentsMargins(5, 5, 5, 5)
-        tick_layout.addWidget(QLabel("X step"))
-        self.pk_xtick_step = QLineEdit("")
-        self.pk_xtick_step.setPlaceholderText("auto")
-        self.pk_xtick_step.setMaximumWidth(60)
-        tick_layout.addWidget(self.pk_xtick_step)
+        tick_layout.addWidget(QLabel("X format"))
+        self.pk_xticks_text = QLineEdit("")
+        self.pk_xticks_text.setPlaceholderText("start:step:end")
+        self.pk_xticks_text.setMaximumWidth(100)
+        tick_layout.addWidget(self.pk_xticks_text)
         tick_layout.addWidget(QLabel("Y step"))
         self.pk_ytick_step = QLineEdit("")
         self.pk_ytick_step.setPlaceholderText("auto")
@@ -2095,6 +2412,9 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         # Wire variable group to rebuild controls
         self.peak_variable_group.buttonClicked.connect(self.update_peak_parameter_controls)
         self.update_peak_parameter_controls()
+        
+        # Populate twist checkboxes
+        self._populate_twist_checkboxes('peak')
 
         self.tab_widget.addTab(tab, "Peak Location")
 
@@ -2236,6 +2556,40 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         vec_pub_button.clicked.connect(self.publish_vector_figure)
         pub_layout.addWidget(vec_pub_button)
         middle_layout.addWidget(pub_frame)
+
+        # Title controls
+        title_frame = QGroupBox("Title")
+        title_layout = QHBoxLayout(title_frame)
+        title_layout.setContentsMargins(5, 5, 5, 5)
+        self.v_title_on = QCheckBox("Title")
+        title_layout.addWidget(self.v_title_on)
+        self.v_title_text = QLineEdit("")
+        self.v_title_text.setPlaceholderText("auto")
+        self.v_title_text.setMaximumWidth(150)
+        title_layout.addWidget(self.v_title_text)
+        middle_layout.addWidget(title_frame)
+
+        # X Label controls
+        xlabel_frame = QGroupBox("X Label")
+        xlabel_layout = QHBoxLayout(xlabel_frame)
+        xlabel_layout.setContentsMargins(5, 5, 5, 5)
+        self.v_xlabel_on = QCheckBox("X Label")
+        xlabel_layout.addWidget(self.v_xlabel_on)
+        self.v_xlabel_text = QLineEdit("Mean Thrust (N)")
+        self.v_xlabel_text.setMaximumWidth(150)
+        xlabel_layout.addWidget(self.v_xlabel_text)
+        middle_layout.addWidget(xlabel_frame)
+
+        # Y Label controls
+        ylabel_frame = QGroupBox("Y Label")
+        ylabel_layout = QHBoxLayout(ylabel_frame)
+        ylabel_layout.setContentsMargins(5, 5, 5, 5)
+        self.v_ylabel_on = QCheckBox("Y Label")
+        ylabel_layout.addWidget(self.v_ylabel_on)
+        self.v_ylabel_text = QLineEdit("Mean Lift (N)")
+        self.v_ylabel_text.setMaximumWidth(150)
+        ylabel_layout.addWidget(self.v_ylabel_text)
+        middle_layout.addWidget(ylabel_frame)
 
         # Axes and controls (compact horizontal)
         axes_frame = QGroupBox("Axes and Controls")
@@ -2820,8 +3174,9 @@ class PaddleStrokeOverviewGUI(QMainWindow):
             
             twist_values = []
             mean_values = []
+            baseline_indices = []
             
-            for exp_key in experiments:
+            for i, exp_key in enumerate(experiments):
                 exp_data = self.data['experiments'][exp_key]
                 params = exp_data['parameters']
                 twist = abs(params.get('twist', 0))
@@ -2841,6 +3196,13 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                 window_force = force_array
                 mean_force = float(np.mean(window_force)) if window_force.size > 0 else np.nan
                 
+                # Check if this is a baseline experiment
+                flow = params.get('flow', 0)
+                period = params.get('period', 0)
+                sweep = params.get('sweep', 0)
+                if self._is_baseline_experiment(flow, period, sweep, twist):
+                    baseline_indices.append(len(twist_values))
+                
                 twist_values.append(twist)
                 mean_values.append(mean_force)
             
@@ -2855,9 +3217,35 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                 if ecolor and not ecolor.startswith('#'):
                     ecolor = '#' + ecolor
                 ewidth = _pf(self.mf_marker_edge_width.text(), 0.4) if hasattr(self, 'mf_marker_edge_width') else 0.4
-                ax.scatter(twist_values, mean_values, marker=marker, s=size, c=colors,
-                           edgecolors=ecolor, linewidths=ewidth,
-                           label=f"{variable_type.title()} {param_value}")
+                
+                # Apply baseline styling to baseline experiments
+                if baseline_indices:
+                    # Create separate arrays for baseline and non-baseline points
+                    baseline_twist = [twist_values[i] for i in baseline_indices]
+                    baseline_mean = [mean_values[i] for i in baseline_indices]
+                    baseline_colors = [colors[i] for i in baseline_indices]
+                    
+                    non_baseline_twist = [twist_values[i] for i in range(len(twist_values)) if i not in baseline_indices]
+                    non_baseline_mean = [mean_values[i] for i in range(len(mean_values)) if i not in baseline_indices]
+                    non_baseline_colors = [colors[i] for i in range(len(colors)) if i not in baseline_indices]
+                    
+                    # Plot non-baseline points first
+                    if non_baseline_twist and non_baseline_mean:
+                        ax.scatter(non_baseline_twist, non_baseline_mean, marker=marker, s=size, c=non_baseline_colors,
+                                   edgecolors=ecolor, linewidths=ewidth,
+                                   label=f"{variable_type.title()} {param_value}")
+                    
+                    # Plot baseline points with special styling
+                    if baseline_twist and baseline_mean:
+                        baseline_color = self.baseline_color if self.baseline_color.startswith('#') else '#' + self.baseline_color
+                        ax.scatter(baseline_twist, baseline_mean, marker=marker, s=size*1.5, c=baseline_color,
+                                   edgecolors='black', linewidths=ewidth*2,
+                                   label=f"{variable_type.title()} {param_value} (Baseline)")
+                else:
+                    # No baseline experiments, plot normally
+                    ax.scatter(twist_values, mean_values, marker=marker, s=size, c=colors,
+                               edgecolors=ecolor, linewidths=ewidth,
+                               label=f"{variable_type.title()} {param_value}")
         
         ax.set_xlabel('Absolute Roll Angle (Twist) [degrees]')
         ax.set_ylabel(f'Mean {channel.title()} Force [N]')
@@ -2891,29 +3279,53 @@ class PaddleStrokeOverviewGUI(QMainWindow):
             if new_max <= new_min:
                 new_max = new_min + 1.0
             ax.set_ylim(new_min, new_max)
-        # Labels
+        # Labels (toggle logic: empty text = no label)
         if self.mf_title_on.isChecked():
-            ttl = self.mf_title_text.text().strip() or f"Mean {channel.title()} vs Twist"
-            ax.set_title(ttl)
+            ttl = self.mf_title_text.text().strip()
+            if ttl:
+                ax.set_title(ttl)
+            else:
+                ax.set_title("")
         else:
             ax.set_title("")
+        
         if self.mf_xlabel_on.isChecked():
-            xl = self.mf_xlabel_text.text().strip() or "Absolute Twist (degrees)"
-            ax.set_xlabel(xl)
+            xl = self.mf_xlabel_text.text().strip()
+            if xl:
+                ax.set_xlabel(xl)
+            else:
+                ax.set_xlabel("")
+        else:
+            ax.set_xlabel("")
+            
         if self.mf_ylabel_on.isChecked():
-            yl = self.mf_ylabel_text.text().strip() or f"Mean {channel.title()} Force (N)"
-            ax.set_ylabel(yl)
+            yl = self.mf_ylabel_text.text().strip()
+            if yl:
+                ax.set_ylabel(yl)
+            else:
+                ax.set_ylabel("")
+        else:
+            ax.set_ylabel("")
         # Tick steps and fonts
         def _pf(s, default=None):
             try:
                 return float(s)
             except Exception:
                 return default
-        xstep = _pf(self.mf_xtick_step.text())
+        
+        # X ticks format parsing (start:step:end)
+        xticks_text = self.mf_xticks_text.text().strip()
+        if xticks_text:
+            parts = xticks_text.split(':')
+            if len(parts) == 3:
+                try:
+                    start, step, end = float(parts[0]), float(parts[1]), float(parts[2])
+                    xticks = np.arange(start, end + step/2, step)
+                    ax.set_xticks(xticks)
+                except ValueError:
+                    pass  # Invalid format, use default
+        
         ystep = _pf(self.mf_ytick_step.text())
-        if xstep and xstep > 0:
-            xmin_cur, xmax_cur = ax.get_xlim()
-            ax.set_xticks(np.arange(xmin_cur, xmax_cur + 0.5 * xstep, xstep))
         if ystep and ystep > 0:
             ymin_cur, ymax_cur = ax.get_ylim()
             ax.set_yticks(np.arange(ymin_cur, ymax_cur + 0.5 * ystep, ystep))
@@ -3132,28 +3544,45 @@ class PaddleStrokeOverviewGUI(QMainWindow):
 
                 if len(pts) == 0:
                     continue
-                color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
+                
+                # Check if this is a baseline experiment
+                flow = m.get('flow', 0)
+                period = m.get('period', 0)
+                sweep = m.get('sweep', 0)
+                twist = m.get('twist', 0)
+                is_baseline = self._is_baseline_experiment(flow, period, sweep, twist)
+                
+                # Apply baseline styling if needed
+                if is_baseline:
+                    color = self.baseline_color if self.baseline_color.startswith('#') else '#' + self.baseline_color
+                    size_multiplier = 1.5
+                    ecolor = 'black'
+                    ewidth_multiplier = 2.0
+                    baseline_suffix = " (Baseline)"
+                else:
+                    color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
+                    size_multiplier = 1.0
+                    ecolor = self.pk_marker_edge_color.text().strip() if hasattr(self, 'pk_marker_edge_color') else '#000000'
+                    if ecolor and not ecolor.startswith('#'):
+                        ecolor = '#' + ecolor
+                    ewidth_multiplier = 1.0
+                    baseline_suffix = ""
+                
                 # plot points with marker style controls
                 def _pf(s, d):
                     try: return float(s)
                     except: return d
                 size = _pf(self.pk_marker_size.text(), 60.0) if hasattr(self, 'pk_marker_size') else 60.0
-                ecolor = self.pk_marker_edge_color.text().strip() if hasattr(self, 'pk_marker_edge_color') else '#000000'
-                if ecolor and not ecolor.startswith('#'):
-                    ecolor = '#' + ecolor
                 ewidth = _pf(self.pk_marker_edge_width.text(), 0.4) if hasattr(self, 'pk_marker_edge_width') else 0.4
                 for j, (px, py) in enumerate(pts):
-                    lbl = f"{variable_type.title()} {param_value}" if not added_label and j == 0 else "_nolegend_"
-                    ax.scatter(px, py, marker=marker, s=size, c=[color], edgecolors=ecolor, linewidths=ewidth, label=lbl)
+                    lbl = f"{variable_type.title()} {param_value}{baseline_suffix}" if not added_label and j == 0 else "_nolegend_"
+                    ax.scatter(px, py, marker=marker, s=size*size_multiplier, c=[color], 
+                               edgecolors=ecolor, linewidths=ewidth*ewidth_multiplier, label=lbl)
                 # connect if two points
                 if len(pts) == 2:
                     ax.plot([pts[0][0], pts[1][0]], [pts[0][1], pts[1][1]], color=color, linewidth=1.0, alpha=0.7)
                 added_label = True
 
-        # Axes formatting
-        ax.set_xlabel('Peak timing (s)')
-        ax.set_ylabel(f'Peak {channel.title()} (N)')
-        ax.grid(self.pk_grid_on.isChecked(), alpha=0.3)
         # Apply user axes options
         def _f(s):
             try: return float(s)
@@ -3167,10 +3596,51 @@ class PaddleStrokeOverviewGUI(QMainWindow):
         # Default to normalized x-limits if none provided
         if xmin is None and xmax is None:
             ax.set_xlim(0.0, 1.0)
+        
+        # Labels (toggle logic: empty text = no label)
+        if self.pk_title_on.isChecked():
+            ttl = self.pk_title_text.text().strip()
+            if ttl:
+                ax.set_title(ttl)
+            else:
+                ax.set_title("")
+        else:
+            ax.set_title("")
+        
+        if self.pk_xlabel_on.isChecked():
+            xl = self.pk_xlabel_text.text().strip()
+            if xl:
+                ax.set_xlabel(xl)
+            else:
+                ax.set_xlabel("")
+        else:
+            ax.set_xlabel("")
+            
+        if self.pk_ylabel_on.isChecked():
+            yl = self.pk_ylabel_text.text().strip()
+            if yl:
+                ax.set_ylabel(yl)
+            else:
+                ax.set_ylabel("")
+        else:
+            ax.set_ylabel("")
+        
+        ax.grid(self.pk_grid_on.isChecked(), alpha=0.3)
+        
         # Tick steps and fonts
-        xstep = _f(self.pk_xtick_step.text()); ystep = _f(self.pk_ytick_step.text())
-        if xstep and xstep > 0:
-            xmin_cur, xmax_cur = ax.get_xlim(); ax.set_xticks(np.arange(xmin_cur, xmax_cur + 0.5*xstep, xstep))
+        # X ticks format parsing (start:step:end)
+        xticks_text = self.pk_xticks_text.text().strip()
+        if xticks_text:
+            parts = xticks_text.split(':')
+            if len(parts) == 3:
+                try:
+                    start, step, end = float(parts[0]), float(parts[1]), float(parts[2])
+                    xticks = np.arange(start, end + step/2, step)
+                    ax.set_xticks(xticks)
+                except ValueError:
+                    pass  # Invalid format, use default
+        
+        ystep = _f(self.pk_ytick_step.text())
         if ystep and ystep > 0:
             ymin_cur, ymax_cur = ax.get_ylim(); ax.set_yticks(np.arange(ymin_cur, ymax_cur + 0.5*ystep, ystep))
         ts = _f(self.pk_tick_fs.text())
@@ -3271,9 +3741,26 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                 # Calculate means from user-trimmed data
                 mt = float(np.mean(thrust[mask]))
                 ml = float(np.mean(lift[mask]))
-                color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
+                
+                # Check if this is a baseline experiment
+                flow = m.get('flow', 0)
+                period = m.get('period', 0)
+                sweep = m.get('sweep', 0)
+                twist = m.get('twist', 0)
+                is_baseline = self._is_baseline_experiment(flow, period, sweep, twist)
+                
+                # Apply baseline styling if needed
+                if is_baseline:
+                    color = self.baseline_color if self.baseline_color.startswith('#') else '#' + self.baseline_color
+                    linewidth = lw * 2.0  # Make baseline vectors thicker
+                    alpha = 1.0  # Make baseline vectors more opaque
+                else:
+                    color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
+                    linewidth = lw
+                    alpha = 0.95
+                
                 # draw shaft with pronounced dashes, then draw a solid head only
-                line, = ax.plot([0, mt], [0, ml], color=color, linewidth=lw, alpha=0.95, solid_capstyle='round')
+                line, = ax.plot([0, mt], [0, ml], color=color, linewidth=linewidth, alpha=alpha, solid_capstyle='round')
                 dashes = _style_to_dashes(ls)
                 if dashes is not None:
                     line.set_dashes(dashes)
@@ -3285,12 +3772,37 @@ class PaddleStrokeOverviewGUI(QMainWindow):
                     tail_y = ml - head_l * uy
                     ax.arrow(tail_x, tail_y, head_l * ux, head_l * uy,
                              head_width=head_w, head_length=head_l, fc=color, ec=color,
-                             linewidth=0, alpha=0.95)
+                             linewidth=0, alpha=alpha)
         
         
-        ax.set_xlabel('Mean Thrust Force (N)')
-        ax.set_ylabel('Mean Lift Force (N)')
-        ax.set_title('Force Vector Plot (Thrust vs Lift)')
+        # Labels (toggle logic: empty text = no label)
+        if self.v_title_on.isChecked():
+            ttl = self.v_title_text.text().strip()
+            if ttl:
+                ax.set_title(ttl)
+            else:
+                ax.set_title("")
+        else:
+            ax.set_title("")
+        
+        if self.v_xlabel_on.isChecked():
+            xl = self.v_xlabel_text.text().strip()
+            if xl:
+                ax.set_xlabel(xl)
+            else:
+                ax.set_xlabel("")
+        else:
+            ax.set_xlabel("")
+            
+        if self.v_ylabel_on.isChecked():
+            yl = self.v_ylabel_text.text().strip()
+            if yl:
+                ax.set_ylabel(yl)
+            else:
+                ax.set_ylabel("")
+        else:
+            ax.set_ylabel("")
+        
         ax.grid(self.v_grid_on.isChecked(), alpha=0.3)
         # Axes limits controls (avoid invalid ranges)
         xmin = _f(self.v_xmin.text()); xmax = _f(self.v_xmax.text())
@@ -3890,6 +4402,50 @@ class PaddleStrokeOverviewGUI(QMainWindow):
             checks[t] = cb
         layout.addStretch()
         setattr(self, store, checks)
+
+    def _populate_twist_checkboxes(self, target: str):
+        """Populate twist checkboxes for the given target (mean/peak/vec)"""
+        # target in {'mean','peak','vec'}
+        checks_attr = None
+        layout_attr = None
+        
+        if target == 'mean':
+            checks_attr = 'mean_twist_checks'
+            layout_attr = 'mean_twist_layout'
+        elif target == 'peak':
+            checks_attr = 'peak_twist_checks'
+            layout_attr = 'peak_twist_layout'
+        elif target == 'vec':
+            checks_attr = 'vec_twist_checks'
+            layout_attr = 'vec_twist_layout'
+        
+        if not checks_attr or not hasattr(self, checks_attr) or not hasattr(self, layout_attr):
+            return
+        
+        checks = getattr(self, checks_attr)
+        layout = getattr(self, layout_attr)
+        
+        # Clear existing checkboxes
+        for i in reversed(range(layout.count())):
+            item = layout.itemAt(i)
+            if item and item.widget():
+                item.widget().setParent(None)
+        checks.clear()
+        
+        # Get available twist values
+        twist_values = sorted(self.param_index.get('twist', []))
+        
+        # Create checkboxes
+        for twist in twist_values:
+            cb = QCheckBox(f"{int(twist)}°")
+            cb.setChecked(True)  # Default to checked
+            cb.stateChanged.connect(lambda: self.plot_mean_force() if target == 'mean' 
+                                  else self.plot_peak_location() if target == 'peak'
+                                  else self.plot_vector())
+            layout.addWidget(cb)
+            checks[twist] = cb
+        
+        layout.addStretch()
 
     def _get_selected_twists(self, target: str):
         checks_attr = None
