@@ -125,13 +125,13 @@ class FullStrokeOverviewGUI(QMainWindow):
         
         # Baseline experimental parameters (including overlap for full stroke)
         self.baseline_params = {
-            'flow': 0.01,
+            'flow': 0.10,
             'period': 2.25,
             'sweep': 80.0,
             'twist': 45.0,
             'overlap': 0.5
         }
-        self.baseline_color = '#4daf4a'  # Green
+        self.baseline_color = '#f00'  # Red
         self.baseline_line_style = '--'
         
         # Custom twist color mapping (default color scheme)
@@ -150,7 +150,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         # Verified settings based on trace analysis
         self.norm_windows = {
             1.75: {'start': 0.70, 'end': 1.75},  # 1.75s period: 1.05s duration
-            2.25: {'start': 0.90, 'end': 2.25}   # 2.25s period: 1.35s duration
+            2.25: {'start': 0.90, 'end': 2.05}   # 2.25s period: 1.15s duration
         }
         self.stroke_split = 0.40  # 40% power stroke, 60% paddle stroke
         
@@ -397,7 +397,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         baseline_layout.addWidget(QLabel("Flow:"), 0, 0)
         self.baseline_flow = QDoubleSpinBox()
         self.baseline_flow.setRange(0.0, 2.0)
-        self.baseline_flow.setValue(0.01)
+        self.baseline_flow.setValue(0.10)
         self.baseline_flow.setDecimals(2)
         self.baseline_flow.setSingleStep(0.1)
         self.baseline_flow.valueChanged.connect(self._update_baseline_params)
@@ -446,7 +446,7 @@ class FullStrokeOverviewGUI(QMainWindow):
         # Baseline color
         baseline_layout.addWidget(QLabel("Color:"), 2, 2)
         self.baseline_color_edit = QLineEdit()
-        self.baseline_color_edit.setText("#4daf4a")
+        self.baseline_color_edit.setText("#f00")
         self.baseline_color_edit.setPlaceholderText("#RRGGBB")
         self.baseline_color_edit.textChanged.connect(self._update_baseline_color)
         baseline_layout.addWidget(self.baseline_color_edit, 2, 3)
@@ -675,9 +675,12 @@ class FullStrokeOverviewGUI(QMainWindow):
                    abs(sweep - self.baseline_params['sweep']) < 1.0 and
                    abs(twist - self.baseline_params['twist']) < 1.0)
         
-        # Include overlap check for full stroke
+        # Include overlap check for full stroke - ALL parameters must match for baseline
         if overlap is not None:
-            matches = matches and abs(overlap - self.baseline_params['overlap']) < 0.1
+            matches = matches and abs(overlap - self.baseline_params['overlap']) < 0.01
+        else:
+            # If overlap is not provided, only match if baseline overlap is default (0.5)
+            matches = matches and abs(self.baseline_params['overlap'] - 0.5) < 0.01
         
         return matches
 
@@ -708,6 +711,19 @@ class FullStrokeOverviewGUI(QMainWindow):
         variable_types = [('Flow', 0), ('Sweep', 1), ('Overlap', 2)]
         channels = [('Thrust', 'thrust'), ('Lift', 'lift')]
 
+        # Get format and paths from selectors (default to PNG and current directory if not available)
+        mf_format = self.mf_pub_format.currentText().lower() if hasattr(self, 'mf_pub_format') else 'png'
+        pk_format = self.pk_pub_format.currentText().lower() if hasattr(self, 'pk_pub_format') else 'png'
+        vec_format = self.vec_pub_format.currentText().lower() if hasattr(self, 'vec_pub_format') else 'png'
+        mf_path = self.mf_pub_path.text() if hasattr(self, 'mf_pub_path') else outdir
+        pk_path = self.pk_pub_path.text() if hasattr(self, 'pk_pub_path') else outdir
+        vec_path = self.vec_pub_path.text() if hasattr(self, 'vec_pub_path') else outdir
+        
+        # Create directories if they don't exist
+        os.makedirs(mf_path, exist_ok=True)
+        os.makedirs(pk_path, exist_ok=True)
+        os.makedirs(vec_path, exist_ok=True)
+
         # Mean plots
         for vname, vidx in variable_types:
             try:
@@ -718,8 +734,11 @@ class FullStrokeOverviewGUI(QMainWindow):
                     self.plot_mean_force()
                     wpx = int(float(self.mf_pub_w.text())); hpx = int(float(self.mf_pub_h.text()))
                     self.mean_force_figure.set_size_inches(wpx/100.0, hpx/100.0)
-                    fname = os.path.join(outdir, f"Mean_{cname}_{vname}.png")
-                    self.mean_force_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+                    fname = os.path.join(mf_path, f"Mean_{cname}_{vname}.{mf_format}")
+                    if mf_format == 'svg':
+                        self.mean_force_figure.savefig(fname, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+                    else:
+                        self.mean_force_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
             except Exception:
                 continue
 
@@ -733,8 +752,11 @@ class FullStrokeOverviewGUI(QMainWindow):
                     self.plot_peak_location()
                     wpx = int(float(self.pk_pub_w.text())); hpx = int(float(self.pk_pub_h.text()))
                     self.peak_location_figure.set_size_inches(wpx/100.0, hpx/100.0)
-                    fname = os.path.join(outdir, f"Peak_{cname}_{vname}.png")
-                    self.peak_location_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+                    fname = os.path.join(pk_path, f"Peak_{cname}_{vname}.{pk_format}")
+                    if pk_format == 'svg':
+                        self.peak_location_figure.savefig(fname, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+                    else:
+                        self.peak_location_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
             except Exception:
                 continue
 
@@ -746,8 +768,11 @@ class FullStrokeOverviewGUI(QMainWindow):
                 self.plot_vector()
                 wpx = int(float(self.vec_pub_w.text())); hpx = int(float(self.vec_pub_h.text()))
                 self.vector_figure.set_size_inches(wpx/100.0, hpx/100.0)
-                fname = os.path.join(outdir, f"Vector_{vname}.png")
-                self.vector_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+                fname = os.path.join(vec_path, f"Vector_{vname}.{vec_format}")
+                if vec_format == 'svg':
+                    self.vector_figure.savefig(fname, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+                else:
+                    self.vector_figure.savefig(fname, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
             except Exception:
                 continue
 
@@ -1603,7 +1628,7 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         """Reset normalization settings to verified defaults"""
         self.norm_windows = {
             1.75: {'start': 0.70, 'end': 1.75},  # 1.75s period: 1.05s duration
-            2.25: {'start': 0.90, 'end': 2.25}   # 2.25s period: 1.35s duration
+            2.25: {'start': 0.90, 'end': 2.05}   # 2.25s period: 1.15s duration
         }
         self.stroke_split = 0.40  # 40% power stroke, 60% paddle stroke
         
@@ -1768,11 +1793,25 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         pub_layout.addWidget(QLabel("H(px)"), 0, 2)
         pub_layout.addWidget(self.pub_h_var, 0, 3)
         pub_layout.addWidget(QLabel("Name"), 1, 0)
-        pub_layout.addWidget(self.pub_name_var, 1, 1, 1, 3)
+        pub_layout.addWidget(self.pub_name_var, 1, 1, 1, 2)
+        pub_layout.addWidget(QLabel("Format:"), 1, 3)
+        self.pub_format_var = QComboBox()
+        self.pub_format_var.addItems(["PNG", "SVG"])
+        self.pub_format_var.setCurrentText("PNG")
+        self.pub_format_var.currentTextChanged.connect(lambda: self._update_traces_pub_filename())
+        pub_layout.addWidget(self.pub_format_var, 1, 4)
+        
+        pub_layout.addWidget(QLabel("Path:"), 2, 0)
+        self.pub_path_var = QLineEdit(r"C:\Users\ad892\Dropbox\01_Sealion_Stroke_Paper\Revised_Figures\Graphs")
+        self.pub_path_var.setMinimumWidth(400)
+        pub_layout.addWidget(self.pub_path_var, 2, 1, 1, 3)
+        pub_browse_button = QPushButton("Browse...")
+        pub_browse_button.clicked.connect(lambda: self._browse_publish_path('pub'))
+        pub_layout.addWidget(pub_browse_button, 2, 4)
         
         pub_button = QPushButton("Publish")
         pub_button.clicked.connect(self.publish_figure)
-        pub_layout.addWidget(pub_button, 0, 4, 2, 1)
+        pub_layout.addWidget(pub_button, 0, 5, 3, 1)
         
         ctrl_layout.addWidget(pub_frame)
         
@@ -2118,30 +2157,102 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         return palette[idx % len(palette)]
         
     def publish_figure(self):
-        """Publish figure (EXACT copy from original)"""
+        """Publish figure with PNG or SVG format support"""
         try:
             # Parse dimensions
             wpx = int(float(self.pub_w_var.text()))
             hpx = int(float(self.pub_h_var.text()))
-            name = self.pub_name_var.text()
+            filename = self.pub_name_var.text()
+            format_type = self.pub_format_var.currentText().lower() if hasattr(self, 'pub_format_var') else 'png'
+            publish_path = self.pub_path_var.text() if hasattr(self, 'pub_path_var') else os.getcwd()
+            
+            # Ensure filename has correct extension
+            if not filename.lower().endswith(f'.{format_type}'):
+                base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                filename = f"{base_name}.{format_type}"
+            
+            # Create directory if it doesn't exist
+            os.makedirs(publish_path, exist_ok=True)
+            
+            # Construct full path
+            full_path = os.path.join(publish_path, filename)
             
             # Save figure
             self.traces_figure.set_size_inches(wpx/100.0, hpx/100.0)
-            self.traces_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
             
-            QMessageBox.information(self, "Success", f"Figure saved as {name}")
+            if format_type == 'svg':
+                self.traces_figure.savefig(full_path, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+            else:  # PNG
+                self.traces_figure.savefig(full_path, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            
+            QMessageBox.information(self, "Success", f"Figure saved as {full_path}")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
 
+    def _update_pub_filename(self, tab_prefix):
+        """Update filename extension when format changes"""
+        format_combo = getattr(self, f'{tab_prefix}_pub_format', None)
+        name_edit = getattr(self, f'{tab_prefix}_pub_name', None)
+        if format_combo and name_edit:
+            format_type = format_combo.currentText().lower()
+            current_name = name_edit.text()
+            # Remove old extension and add new one
+            base_name = current_name.rsplit('.', 1)[0] if '.' in current_name else current_name
+            new_name = f"{base_name}.{format_type}"
+            name_edit.setText(new_name)
+    
+    def _update_traces_pub_filename(self):
+        """Update filename extension for traces tab when format changes"""
+        if hasattr(self, 'pub_format_var') and hasattr(self, 'pub_name_var'):
+            format_type = self.pub_format_var.currentText().lower()
+            current_name = self.pub_name_var.text()
+            # Remove old extension and add new one
+            base_name = current_name.rsplit('.', 1)[0] if '.' in current_name else current_name
+            new_name = f"{base_name}.{format_type}"
+            self.pub_name_var.setText(new_name)
+    
+    def _browse_publish_path(self, tab_prefix):
+        """Open file dialog to browse for publish path (directory)"""
+        path_attr = f'{tab_prefix}_pub_path' if tab_prefix != 'pub' else 'pub_path_var'
+        path_widget = getattr(self, path_attr, None)
+        
+        if path_widget:
+            current_path = path_widget.text()
+            if not os.path.exists(current_path):
+                current_path = os.path.expanduser("~")
+            
+            folder = QFileDialog.getExistingDirectory(self, "Select Publish Directory", current_path)
+            if folder:
+                path_widget.setText(folder)
+    
     def publish_mean_force_figure(self):
         try:
             wpx = int(float(self.mf_pub_w.text()))
             hpx = int(float(self.mf_pub_h.text()))
-            name = self.mf_pub_name.text()
+            filename = self.mf_pub_name.text()
+            format_type = self.mf_pub_format.currentText().lower()
+            publish_path = self.mf_pub_path.text() if hasattr(self, 'mf_pub_path') else os.getcwd()
+            
+            # Ensure filename has correct extension
+            if not filename.lower().endswith(f'.{format_type}'):
+                base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                filename = f"{base_name}.{format_type}"
+            
+            # Create directory if it doesn't exist
+            os.makedirs(publish_path, exist_ok=True)
+            
+            # Construct full path
+            full_path = os.path.join(publish_path, filename)
+            
             self.mean_force_figure.set_size_inches(wpx/100.0, hpx/100.0)
-            self.mean_force_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
-            QMessageBox.information(self, "Success", f"Figure saved as {name}")
+            
+            if format_type == 'svg':
+                self.mean_force_figure.savefig(full_path, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+            else:  # PNG
+                self.mean_force_figure.savefig(full_path, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            
+            QMessageBox.information(self, "Success", f"Figure saved as {full_path}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
 
@@ -2149,10 +2260,29 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         try:
             wpx = int(float(self.pk_pub_w.text()))
             hpx = int(float(self.pk_pub_h.text()))
-            name = self.pk_pub_name.text()
+            filename = self.pk_pub_name.text()
+            format_type = self.pk_pub_format.currentText().lower()
+            publish_path = self.pk_pub_path.text() if hasattr(self, 'pk_pub_path') else os.getcwd()
+            
+            # Ensure filename has correct extension
+            if not filename.lower().endswith(f'.{format_type}'):
+                base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                filename = f"{base_name}.{format_type}"
+            
+            # Create directory if it doesn't exist
+            os.makedirs(publish_path, exist_ok=True)
+            
+            # Construct full path
+            full_path = os.path.join(publish_path, filename)
+            
             self.peak_location_figure.set_size_inches(wpx/100.0, hpx/100.0)
-            self.peak_location_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
-            QMessageBox.information(self, "Success", f"Figure saved as {name}")
+            
+            if format_type == 'svg':
+                self.peak_location_figure.savefig(full_path, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+            else:  # PNG
+                self.peak_location_figure.savefig(full_path, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            
+            QMessageBox.information(self, "Success", f"Figure saved as {full_path}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
 
@@ -2160,10 +2290,29 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         try:
             wpx = int(float(self.vec_pub_w.text()))
             hpx = int(float(self.vec_pub_h.text()))
-            name = self.vec_pub_name.text()
+            filename = self.vec_pub_name.text()
+            format_type = self.vec_pub_format.currentText().lower()
+            publish_path = self.vec_pub_path.text() if hasattr(self, 'vec_pub_path') else os.getcwd()
+            
+            # Ensure filename has correct extension
+            if not filename.lower().endswith(f'.{format_type}'):
+                base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                filename = f"{base_name}.{format_type}"
+            
+            # Create directory if it doesn't exist
+            os.makedirs(publish_path, exist_ok=True)
+            
+            # Construct full path
+            full_path = os.path.join(publish_path, filename)
+            
             self.vector_figure.set_size_inches(wpx/100.0, hpx/100.0)
-            self.vector_figure.savefig(name, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
-            QMessageBox.information(self, "Success", f"Figure saved as {name}")
+            
+            if format_type == 'svg':
+                self.vector_figure.savefig(full_path, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
+            else:  # PNG
+                self.vector_figure.savefig(full_path, dpi=100, bbox_inches='tight', facecolor='white', edgecolor='none')
+            
+            QMessageBox.information(self, "Success", f"Figure saved as {full_path}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to publish figure: {e}")
         
@@ -2245,23 +2394,44 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
 
         # Publish controls (compact)
         pub_frame = QGroupBox("Publish")
-        pub_layout = QHBoxLayout(pub_frame)
+        pub_layout = QVBoxLayout(pub_frame)
         pub_layout.setContentsMargins(5, 5, 5, 5)
-        pub_layout.addWidget(QLabel("W(px)"))
+        
+        # First row: dimensions, name, format, button
+        pub_row1 = QHBoxLayout()
+        pub_row1.addWidget(QLabel("W(px)"))
         self.mf_pub_w = QLineEdit("1200")
         self.mf_pub_w.setMaximumWidth(60)
-        pub_layout.addWidget(self.mf_pub_w)
-        pub_layout.addWidget(QLabel("H(px)"))
+        pub_row1.addWidget(self.mf_pub_w)
+        pub_row1.addWidget(QLabel("H(px)"))
         self.mf_pub_h = QLineEdit("800")
         self.mf_pub_h.setMaximumWidth(60)
-        pub_layout.addWidget(self.mf_pub_h)
-        pub_layout.addWidget(QLabel("Name"))
+        pub_row1.addWidget(self.mf_pub_h)
+        pub_row1.addWidget(QLabel("Name"))
         self.mf_pub_name = QLineEdit("MeanForce_plot.png")
         self.mf_pub_name.setMaximumWidth(150)
-        pub_layout.addWidget(self.mf_pub_name)
-        mf_pub_button = QPushButton("Publish PNG")
+        pub_row1.addWidget(self.mf_pub_name)
+        pub_row1.addWidget(QLabel("Format:"))
+        self.mf_pub_format = QComboBox()
+        self.mf_pub_format.addItems(["PNG", "SVG"])
+        self.mf_pub_format.setCurrentText("PNG")
+        self.mf_pub_format.currentTextChanged.connect(lambda: self._update_pub_filename('mf'))
+        pub_row1.addWidget(self.mf_pub_format)
+        mf_pub_button = QPushButton("Publish")
         mf_pub_button.clicked.connect(self.publish_mean_force_figure)
-        pub_layout.addWidget(mf_pub_button)
+        pub_row1.addWidget(mf_pub_button)
+        pub_layout.addLayout(pub_row1)
+        
+        # Second row: path
+        pub_row2 = QHBoxLayout()
+        pub_row2.addWidget(QLabel("Path:"))
+        self.mf_pub_path = QLineEdit(r"C:\Users\ad892\Dropbox\01_Sealion_Stroke_Paper\Revised_Figures\Graphs")
+        pub_row2.addWidget(self.mf_pub_path)
+        mf_browse_button = QPushButton("Browse...")
+        mf_browse_button.clicked.connect(lambda: self._browse_publish_path('mf'))
+        pub_row2.addWidget(mf_browse_button)
+        pub_layout.addLayout(pub_row2)
+        
         middle_layout.addWidget(pub_frame)
 
         # Axes & Legend Controls (compact horizontal)
@@ -2380,6 +2550,10 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.mf_marker_edge_width = QLineEdit("0.4")
         self.mf_marker_edge_width.setMaximumWidth(50)
         marker_layout.addWidget(self.mf_marker_edge_width)
+        self.mf_outline_only = QCheckBox("Outline Only")
+        self.mf_outline_only.setChecked(False)
+        self.mf_outline_only.setToolTip("When enabled, markers use transparent fill with twist color as outline")
+        marker_layout.addWidget(self.mf_outline_only)
         self.mf_grid_on = QCheckBox("Grid")
         self.mf_grid_on.setChecked(True)
         marker_layout.addWidget(self.mf_grid_on)
@@ -2484,23 +2658,44 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
 
         # Publish controls (compact)
         pub_frame = QGroupBox("Publish")
-        pub_layout = QHBoxLayout(pub_frame)
+        pub_layout = QVBoxLayout(pub_frame)
         pub_layout.setContentsMargins(5, 5, 5, 5)
-        pub_layout.addWidget(QLabel("W(px)"))
+        
+        # First row: dimensions, name, format, button
+        pub_row1 = QHBoxLayout()
+        pub_row1.addWidget(QLabel("W(px)"))
         self.pk_pub_w = QLineEdit("1200")
         self.pk_pub_w.setMaximumWidth(60)
-        pub_layout.addWidget(self.pk_pub_w)
-        pub_layout.addWidget(QLabel("H(px)"))
+        pub_row1.addWidget(self.pk_pub_w)
+        pub_row1.addWidget(QLabel("H(px)"))
         self.pk_pub_h = QLineEdit("800")
         self.pk_pub_h.setMaximumWidth(60)
-        pub_layout.addWidget(self.pk_pub_h)
-        pub_layout.addWidget(QLabel("Name"))
+        pub_row1.addWidget(self.pk_pub_h)
+        pub_row1.addWidget(QLabel("Name"))
         self.pk_pub_name = QLineEdit("PeakLocation_plot.png")
         self.pk_pub_name.setMaximumWidth(150)
-        pub_layout.addWidget(self.pk_pub_name)
-        pk_pub_button = QPushButton("Publish PNG")
+        pub_row1.addWidget(self.pk_pub_name)
+        pub_row1.addWidget(QLabel("Format:"))
+        self.pk_pub_format = QComboBox()
+        self.pk_pub_format.addItems(["PNG", "SVG"])
+        self.pk_pub_format.setCurrentText("PNG")
+        self.pk_pub_format.currentTextChanged.connect(lambda: self._update_pub_filename('pk'))
+        pub_row1.addWidget(self.pk_pub_format)
+        pk_pub_button = QPushButton("Publish")
         pk_pub_button.clicked.connect(self.publish_peak_location_figure)
-        pub_layout.addWidget(pk_pub_button)
+        pub_row1.addWidget(pk_pub_button)
+        pub_layout.addLayout(pub_row1)
+        
+        # Second row: path
+        pub_row2 = QHBoxLayout()
+        pub_row2.addWidget(QLabel("Path:"))
+        self.pk_pub_path = QLineEdit(r"C:\Users\ad892\Dropbox\01_Sealion_Stroke_Paper\Revised_Figures\Graphs")
+        pub_row2.addWidget(self.pk_pub_path)
+        pk_browse_button = QPushButton("Browse...")
+        pk_browse_button.clicked.connect(lambda: self._browse_publish_path('pk'))
+        pub_row2.addWidget(pk_browse_button)
+        pub_layout.addLayout(pub_row2)
+        
         middle_layout.addWidget(pub_frame)
 
         # Axes and legend controls (compact horizontal)
@@ -2558,6 +2753,10 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.pk_marker_edge_width = QLineEdit("0.4")
         self.pk_marker_edge_width.setMaximumWidth(50)
         marker_layout.addWidget(self.pk_marker_edge_width)
+        self.pk_outline_only = QCheckBox("Outline Only")
+        self.pk_outline_only.setChecked(False)
+        self.pk_outline_only.setToolTip("When enabled, markers use transparent fill with twist color as outline")
+        marker_layout.addWidget(self.pk_outline_only)
         self.pk_grid_on = QCheckBox("Grid")
         self.pk_grid_on.setChecked(True)
         marker_layout.addWidget(self.pk_grid_on)
@@ -2774,23 +2973,44 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
 
         # Publish controls (compact)
         pub_frame = QGroupBox("Publish")
-        pub_layout = QHBoxLayout(pub_frame)
+        pub_layout = QVBoxLayout(pub_frame)
         pub_layout.setContentsMargins(5, 5, 5, 5)
-        pub_layout.addWidget(QLabel("W(px)"))
+        
+        # First row: dimensions, name, format, button
+        pub_row1 = QHBoxLayout()
+        pub_row1.addWidget(QLabel("W(px)"))
         self.vec_pub_w = QLineEdit("1200")
         self.vec_pub_w.setMaximumWidth(60)
-        pub_layout.addWidget(self.vec_pub_w)
-        pub_layout.addWidget(QLabel("H(px)"))
+        pub_row1.addWidget(self.vec_pub_w)
+        pub_row1.addWidget(QLabel("H(px)"))
         self.vec_pub_h = QLineEdit("800")
         self.vec_pub_h.setMaximumWidth(60)
-        pub_layout.addWidget(self.vec_pub_h)
-        pub_layout.addWidget(QLabel("Name"))
+        pub_row1.addWidget(self.vec_pub_h)
+        pub_row1.addWidget(QLabel("Name"))
         self.vec_pub_name = QLineEdit("Vector_plot.png")
         self.vec_pub_name.setMaximumWidth(150)
-        pub_layout.addWidget(self.vec_pub_name)
-        vec_pub_button = QPushButton("Publish PNG")
+        pub_row1.addWidget(self.vec_pub_name)
+        pub_row1.addWidget(QLabel("Format:"))
+        self.vec_pub_format = QComboBox()
+        self.vec_pub_format.addItems(["PNG", "SVG"])
+        self.vec_pub_format.setCurrentText("PNG")
+        self.vec_pub_format.currentTextChanged.connect(lambda: self._update_pub_filename('vec'))
+        pub_row1.addWidget(self.vec_pub_format)
+        vec_pub_button = QPushButton("Publish")
         vec_pub_button.clicked.connect(self.publish_vector_figure)
-        pub_layout.addWidget(vec_pub_button)
+        pub_row1.addWidget(vec_pub_button)
+        pub_layout.addLayout(pub_row1)
+        
+        # Second row: path
+        pub_row2 = QHBoxLayout()
+        pub_row2.addWidget(QLabel("Path:"))
+        self.vec_pub_path = QLineEdit(r"C:\Users\ad892\Dropbox\01_Sealion_Stroke_Paper\Revised_Figures\Graphs")
+        pub_row2.addWidget(self.vec_pub_path)
+        vec_browse_button = QPushButton("Browse...")
+        vec_browse_button.clicked.connect(lambda: self._browse_publish_path('vec'))
+        pub_row2.addWidget(vec_browse_button)
+        pub_layout.addLayout(pub_row2)
+        
         middle_layout.addWidget(pub_frame)
 
         # Axes and controls (compact horizontal)
@@ -2822,6 +3042,12 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.v_tick_font.addItems(['Default','DejaVu Sans','Arial','Calibri','Times New Roman','Helvetica'])
         self.v_tick_font.setMaximumWidth(100)
         axes_layout.addWidget(self.v_tick_font)
+        axes_layout.addWidget(QLabel("Tick Size:"))
+        self.v_tick_fontsize = QSpinBox()
+        self.v_tick_fontsize.setRange(8, 20)
+        self.v_tick_fontsize.setValue(10)
+        self.v_tick_fontsize.setMaximumWidth(60)
+        axes_layout.addWidget(self.v_tick_fontsize)
         self.v_grid_on = QCheckBox("Grid")
         self.v_grid_on.setChecked(True)
         axes_layout.addWidget(self.v_grid_on)
@@ -2854,6 +3080,12 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.v_xlabel_text = QLineEdit("Mean Thrust Force (N)")
         self.v_xlabel_text.setMaximumWidth(150)
         xlabel_layout.addWidget(self.v_xlabel_text)
+        xlabel_layout.addWidget(QLabel("Font Size:"))
+        self.v_xlabel_fontsize = QSpinBox()
+        self.v_xlabel_fontsize.setRange(8, 24)
+        self.v_xlabel_fontsize.setValue(12)
+        self.v_xlabel_fontsize.setMaximumWidth(60)
+        xlabel_layout.addWidget(self.v_xlabel_fontsize)
         additional_layout.addWidget(xlabel_frame)
 
         # Y Label controls
@@ -2865,6 +3097,12 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.v_ylabel_text = QLineEdit("Mean Lift Force (N)")
         self.v_ylabel_text.setMaximumWidth(150)
         ylabel_layout.addWidget(self.v_ylabel_text)
+        ylabel_layout.addWidget(QLabel("Font Size:"))
+        self.v_ylabel_fontsize = QSpinBox()
+        self.v_ylabel_fontsize.setRange(8, 24)
+        self.v_ylabel_fontsize.setValue(12)
+        self.v_ylabel_fontsize.setMaximumWidth(60)
+        ylabel_layout.addWidget(self.v_ylabel_fontsize)
         additional_layout.addWidget(ylabel_frame)
 
         # Assemble controls panel
@@ -2918,6 +3156,10 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
             self.vec_fixed_params_label.setText("Flow: 0.1 | Sweep: 80° | Period: 2.25s | Overlap: Variable")
             values = self.get_available_overlap_values(); label_name = 'overlap'
         linestyles = ['-','--','-.',':']
+        markers = ["o","s","^","v","D","p","*","h","X","+"]
+        # Twist angles 0:15:90
+        twist_angles = [0, 15, 30, 45, 60, 75, 90]
+        
         for i, value in enumerate(sorted(values)):
             row_widget = QWidget()
             row = QHBoxLayout(row_widget)
@@ -2930,11 +3172,24 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
             row.addWidget(QLabel("Line:"))
             style = QComboBox(); style.addItems(linestyles); style.setCurrentText(linestyles[i % len(linestyles)])
             row.addWidget(style)
+            row.addWidget(QLabel("Marker:"))
+            marker = QComboBox(); marker.addItems(markers); marker.setCurrentText(markers[i % len(markers)])
+            row.addWidget(marker)
             tg = QCheckBox("Show"); tg.setChecked(True)
             row.addWidget(tg)
+            
+            # Add twist angle selection to the right
+            row.addWidget(QLabel("Twists:"))
+            twist_checks = {}
+            for angle in twist_angles:
+                cb = QCheckBox(f"{angle}°")
+                cb.setChecked(True)  # Default to all checked
+                row.addWidget(cb)
+                twist_checks[angle] = cb
+            
             row.addStretch()
             self.vec_var_controls_layout.addWidget(row_widget)
-            self.vec_parameter_controls[value] = {'style': style, 'toggle': tg}
+            self.vec_parameter_controls[value] = {'style': style, 'marker': marker, 'toggle': tg, 'twist_checks': twist_checks}
         
     def create_mean_overview_tab(self):
         """Create the Mean Overview tab with decoupled data selection"""
@@ -3503,6 +3758,7 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
                 if ecolor and not ecolor.startswith('#'):
                     ecolor = '#' + ecolor
                 ewidth = _pf(self.mf_marker_edge_width.text(), 0.4) if hasattr(self, 'mf_marker_edge_width') else 0.4
+                outline_only = self.mf_outline_only.isChecked() if hasattr(self, 'mf_outline_only') else False
                 
                 # Apply baseline styling to baseline experiments
                 if baseline_indices:
@@ -3517,21 +3773,42 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
                     
                     # Plot non-baseline points first
                     if non_baseline_twist and non_baseline_mean:
-                        ax.scatter(non_baseline_twist, non_baseline_mean, marker=marker, s=size, c=non_baseline_colors,
-                                   edgecolors=ecolor, linewidths=ewidth,
-                                   label=f"{variable_type.title()} {param_value}")
+                        if outline_only:
+                            # Outline only: transparent fill, twist color as edge
+                            ax.scatter(non_baseline_twist, non_baseline_mean, marker=marker, s=size, 
+                                       facecolors='none', edgecolors=non_baseline_colors, linewidths=ewidth,
+                                       label=f"{variable_type.title()} {param_value}")
+                        else:
+                            # Normal: twist color fill, specified edge color
+                            ax.scatter(non_baseline_twist, non_baseline_mean, marker=marker, s=size, c=non_baseline_colors,
+                                       edgecolors=ecolor, linewidths=ewidth,
+                                       label=f"{variable_type.title()} {param_value}")
                     
                     # Plot baseline points with special styling
                     if baseline_twist and baseline_mean:
                         baseline_color = self.baseline_color if self.baseline_color.startswith('#') else '#' + self.baseline_color
-                        ax.scatter(baseline_twist, baseline_mean, marker=marker, s=size*1.5, c=baseline_color,
-                                   edgecolors='black', linewidths=ewidth*2,
-                                   label=f"{variable_type.title()} {param_value} (Baseline)")
+                        if outline_only:
+                            # Outline only: transparent fill, baseline color as edge
+                            ax.scatter(baseline_twist, baseline_mean, marker=marker, s=size*1.5,
+                                       facecolors='none', edgecolors=baseline_color, linewidths=ewidth*2,
+                                       label=f"{variable_type.title()} {param_value} (Baseline)")
+                        else:
+                            # Normal: baseline color fill, black edge
+                            ax.scatter(baseline_twist, baseline_mean, marker=marker, s=size*1.5, c=baseline_color,
+                                       edgecolors='black', linewidths=ewidth*2,
+                                       label=f"{variable_type.title()} {param_value} (Baseline)")
                 else:
                     # No baseline experiments, plot normally
-                    ax.scatter(twist_values, mean_values, marker=marker, s=size, c=colors,
-                               edgecolors=ecolor, linewidths=ewidth,
-                               label=f"{variable_type.title()} {param_value}")
+                    if outline_only:
+                        # Outline only: transparent fill, twist color as edge
+                        ax.scatter(twist_values, mean_values, marker=marker, s=size,
+                                   facecolors='none', edgecolors=colors, linewidths=ewidth,
+                                   label=f"{variable_type.title()} {param_value}")
+                    else:
+                        # Normal: twist color fill, specified edge color
+                        ax.scatter(twist_values, mean_values, marker=marker, s=size, c=colors,
+                                   edgecolors=ecolor, linewidths=ewidth,
+                                   label=f"{variable_type.title()} {param_value}")
         
         ax.set_xlabel('Absolute Roll Angle (Twist) [degrees]')
         ax.set_ylabel(f'Mean {channel.title()} Force [N]')
@@ -3826,9 +4103,17 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
                 if ecolor and not ecolor.startswith('#'):
                     ecolor = '#' + ecolor
                 ewidth = _pf(self.pk_marker_edge_width.text(), 0.4) if hasattr(self, 'pk_marker_edge_width') else 0.4
+                outline_only = self.pk_outline_only.isChecked() if hasattr(self, 'pk_outline_only') else False
                 for j, (px, py) in enumerate(pts):
                     lbl = f"{variable_type.title()} {param_value}" if not added_label and j == 0 else "_nolegend_"
-                    ax.scatter(px, py, marker=marker, s=size, c=[color], edgecolors=ecolor, linewidths=ewidth, label=lbl)
+                    if outline_only:
+                        # Outline only: transparent fill, twist color as edge
+                        ax.scatter(px, py, marker=marker, s=size, facecolors='none', 
+                                   edgecolors=[color], linewidths=ewidth, label=lbl)
+                    else:
+                        # Normal: twist color fill, specified edge color
+                        ax.scatter(px, py, marker=marker, s=size, c=[color], 
+                                   edgecolors=ecolor, linewidths=ewidth, label=lbl)
                 # connect if two points
                 if len(pts) == 2:
                     ax.plot([pts[0][0], pts[1][0]], [pts[0][1], pts[1][1]], color=color, linewidth=1.0, alpha=0.7)
@@ -3918,9 +4203,6 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.vector_figure.clear()
         ax = self.vector_figure.add_subplot(111)
         
-        # Build selected twist set from checkboxes (if any)
-        selected_twists = self._get_selected_twists('vec')
-        
         # Style options
         def _f(s):
             try: return float(s)
@@ -3946,6 +4228,16 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         def _linestyle(val):
             ctrl = self.vec_parameter_controls.get(val)
             return ctrl['style'].currentText() if ctrl else '-'
+        def _marker(val):
+            ctrl = self.vec_parameter_controls.get(val)
+            return ctrl['marker'].currentText() if ctrl and 'marker' in ctrl else 'o'
+        def _get_selected_twists_for_param(val):
+            """Get selected twist angles for a specific parameter value"""
+            ctrl = self.vec_parameter_controls.get(val)
+            if not ctrl or 'twist_checks' not in ctrl:
+                return None  # If no twist checks, include all
+            twist_checks = ctrl['twist_checks']
+            return {angle for angle, cb in twist_checks.items() if cb.isChecked()}
         
         # Iterate values
         for param_value, ctrl in list(self.vec_parameter_controls.items()):
@@ -3955,11 +4247,15 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
             if not experiments:
                 continue
             ls = _linestyle(param_value)
+            marker = _marker(param_value)
+            # Get selected twists for this parameter value
+            selected_twists = _get_selected_twists_for_param(param_value)
+            
             for exp_key in experiments:
                 exp = self.data['experiments'][exp_key]
                 m = self._param_map(exp['parameters'])
                 
-                # Apply twist filtering
+                # Apply twist filtering for this parameter value
                 if selected_twists is not None and m['twist'] not in selected_twists:
                     continue
                 
@@ -3978,20 +4274,13 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
                 mt = float(np.mean(thrust[mask]))
                 ml = float(np.mean(lift[mask]))
                 color = self.twist_color_map.get(m['twist'], (0.2,0.2,0.2,1.0))
-                # draw shaft with pronounced dashes, then draw a solid head only
+                # draw shaft with pronounced dashes
                 line, = ax.plot([0, mt], [0, ml], color=color, linewidth=lw, alpha=0.95, solid_capstyle='round')
                 dashes = _style_to_dashes(ls)
                 if dashes is not None:
                     line.set_dashes(dashes)
-                # arrow head at the tip, keep it solid regardless of shaft style
-                length = float(np.hypot(mt, ml))
-                if length > 0:
-                    ux, uy = mt/length, ml/length
-                    tail_x = mt - head_l * ux
-                    tail_y = ml - head_l * uy
-                    ax.arrow(tail_x, tail_y, head_l * ux, head_l * uy,
-                             head_width=head_w, head_length=head_l, fc=color, ec=color,
-                             linewidth=0, alpha=0.95)
+                # marker at the end of the vector instead of arrow head
+                ax.scatter([mt], [ml], marker=marker, s=100, c=[color], edgecolors='none', alpha=0.95, zorder=10)
         
         
         ax.grid(self.v_grid_on.isChecked(), alpha=0.3)
@@ -4009,7 +4298,7 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         if self.v_xlabel_on.isChecked():
             xl = self.v_xlabel_text.text().strip()
             if xl:
-                ax.set_xlabel(xl)
+                ax.set_xlabel(xl, fontsize=self.v_xlabel_fontsize.value())
             else:
                 ax.set_xlabel("")
         else:
@@ -4018,7 +4307,7 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         if self.v_ylabel_on.isChecked():
             yl = self.v_ylabel_text.text().strip()
             if yl:
-                ax.set_ylabel(yl)
+                ax.set_ylabel(yl, fontsize=self.v_ylabel_fontsize.value())
             else:
                 ax.set_ylabel("")
         else:
@@ -4045,6 +4334,9 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
             ax.set_ylim(new_min, new_max)
         # Maintain equal aspect while respecting explicit limits
         ax.set_aspect('equal', adjustable='box')
+        
+        # Set tick font size
+        ax.tick_params(axis='both', which='major', labelsize=self.v_tick_fontsize.value())
         
         self.vector_canvas.draw()
         
