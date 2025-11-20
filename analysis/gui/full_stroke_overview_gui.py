@@ -2942,14 +2942,22 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         self.vec_arrow_lw = QLineEdit("1.5")
         self.vec_arrow_lw.setMaximumWidth(50)
         plot_control_layout.addWidget(self.vec_arrow_lw)
-        plot_control_layout.addWidget(QLabel("Head W"))
-        self.vec_head_w = QLineEdit("0.01")
-        self.vec_head_w.setMaximumWidth(50)
-        plot_control_layout.addWidget(self.vec_head_w)
-        plot_control_layout.addWidget(QLabel("Head L"))
-        self.vec_head_l = QLineEdit("0.02")
-        self.vec_head_l.setMaximumWidth(50)
-        plot_control_layout.addWidget(self.vec_head_l)
+        plot_control_layout.addWidget(QLabel("Marker Size"))
+        self.vec_marker_size = QLineEdit("100")
+        self.vec_marker_size.setMaximumWidth(50)
+        plot_control_layout.addWidget(self.vec_marker_size)
+        plot_control_layout.addWidget(QLabel("Edge color"))
+        self.vec_marker_edge_color = QLineEdit("#000000")
+        self.vec_marker_edge_color.setMaximumWidth(80)
+        plot_control_layout.addWidget(self.vec_marker_edge_color)
+        plot_control_layout.addWidget(QLabel("Edge width"))
+        self.vec_marker_edge_width = QLineEdit("0.4")
+        self.vec_marker_edge_width.setMaximumWidth(50)
+        plot_control_layout.addWidget(self.vec_marker_edge_width)
+        self.vec_outline_only = QCheckBox("Outline Only")
+        self.vec_outline_only.setChecked(False)
+        self.vec_outline_only.setToolTip("When enabled, markers use transparent fill with twist color as outline")
+        plot_control_layout.addWidget(self.vec_outline_only)
         top_layout.addWidget(plot_control_frame)
         
         # Twist selection (checkbox row)
@@ -4207,8 +4215,6 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
         def _f(s):
             try: return float(s)
             except: return None
-        head_w = _f(self.vec_head_w.text()) or 0.08
-        head_l = _f(self.vec_head_l.text()) or 0.12
         lw = _f(self.vec_arrow_lw.text()) or 1.5
         # Make line styles more pronounced via explicit dash patterns
         def _style_to_dashes(style: str):
@@ -4280,7 +4286,24 @@ The normalization formula: t_norm = (t_abs - start) / (end - start)
                 if dashes is not None:
                     line.set_dashes(dashes)
                 # marker at the end of the vector instead of arrow head
-                ax.scatter([mt], [ml], marker=marker, s=100, c=[color], edgecolors='none', alpha=0.95, zorder=10)
+                def _pf(s, d):
+                    try: return float(s)
+                    except: return d
+                size = _pf(self.vec_marker_size.text(), 100.0) if hasattr(self, 'vec_marker_size') else 100.0
+                edge_width = _pf(self.vec_marker_edge_width.text(), 0.4) if hasattr(self, 'vec_marker_edge_width') else 0.4
+                outline_only = self.vec_outline_only.isChecked() if hasattr(self, 'vec_outline_only') else False
+                edge_color = self.vec_marker_edge_color.text().strip() if hasattr(self, 'vec_marker_edge_color') else '#000000'
+                if edge_color and not edge_color.startswith('#'):
+                    edge_color = '#' + edge_color
+                
+                if outline_only:
+                    # Outline only: transparent fill, twist color as edge
+                    ax.scatter([mt], [ml], marker=marker, s=size, facecolors='none', 
+                               edgecolors=[color], linewidths=edge_width, alpha=0.95, zorder=10)
+                else:
+                    # Normal: twist color fill, specified edge color
+                    ax.scatter([mt], [ml], marker=marker, s=size, c=[color], 
+                               edgecolors=edge_color, linewidths=edge_width, alpha=0.95, zorder=10)
         
         
         ax.grid(self.v_grid_on.isChecked(), alpha=0.3)
